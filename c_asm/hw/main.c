@@ -33,12 +33,15 @@ char *hash_list[] = {"MD5", "SHA1", "SHA256", "SHA512"};
 char *cipher_list[] = {"AES-128-CBC", "AES-192-CBC", "AES-256-CBC", "AES-128-ECB", "AES-192-ECB", "AES-256-ECB"};
 
 int file_exist(const char *path);
-int encrypt_file(char *input, char *output, char *algorithm, int flag);
 int check_algorithm(short unsigned int *flag, char *algorithm);
 int encrypt(FILE *infp, FILE *outfp, const EVP_CIPHER *cipher,
             const unsigned char *key, const unsigned char *iv);
+int decrypt(FILE *infp, FILE *outfp, const EVP_CIPHER *cipher,
+            const unsigned char *key, const unsigned char *iv);
+int digest(FILE *infp, FILE *outfp, const EVP_MD *digest);
 void usage();
 void check_argv(int flag);
+void encrypt_file(char *input, char *output, char *algorithm, int flag);
 void create_dir(const char *output);
 void encrypt_dir(char *input, char *output, char *algorithm, int flag);
 
@@ -88,13 +91,11 @@ int main(int argc, char* argv[]) {
 
     OpenSSL_add_all_algorithms();
     
-    if (flag & FLAG_CIPHER){
-        if ( file_exist(input) == 1 ) {
-            encrypt_dir(input, output, algorithm, flag);
-        }
-        else {
-            encrypt_file(input, output, algorithm, flag);
-        }
+    if ( file_exist(input) == 1 ) {
+        encrypt_dir(input, output, algorithm, flag);
+    }
+    else {
+        encrypt_file(input, output, algorithm, flag);
     }
 
     return 0;
@@ -240,16 +241,40 @@ int decrypt(FILE *infp, FILE *outfp, const EVP_CIPHER *cipher,
 
 }
 
-int encrypt_file(char *input, char *output, char *algorithm, int flag) {
+int digest(FILE *infp, FILE *outfp, const EVP_MD *md) {
+
+    int inlen, outlen;
+    char inbuf[BUFSIZ], outbuf[EVP_MAX_MD_SIZE + 1];
+    char hexbuf[EVP_MAX_MD_SIZE * 2 + 1];
+    EVP_MD_CTX *ctx = EVP_MD_CTX_new();
+
+    EVP_MD_CTX_init(ctx);
+
+    EVP_DigestInit_ex(ctx, md, NULL);
+    while((inlen = fread(inbuf, 1, sizeof(inbuf), infp)) > 0) {
+        if(!EVP_DigestUpdate(ctx, outbuf, outlen)) {
+            printf("error\n");
+            EVP_MD_CTX_free(ctx);
+            return -1;
+        }
+    }
+    EVP_DigestFinal_ex(ctx, outbuf, outlen);
+
+    for (int i = 0; i < outlen; ++i) {
+        sprintf(&hexbuf[i*2], "%02X", outbuf[i]);
+    }
+
+    fwrite(hexbuf, 1, outlen, outfp);
+
+    EVP_MD_CTX_free(ctx);
+
+    return 0;
+
+}
+
+void encrypt_file(char *input, char *output, char *algorithm, int flag) {
 
     FILE *infp, *outfp;
-    int opt;
-    unsigned char key[EVP_MAX_KEY_LENGTH];
-    unsigned char iv[EVP_MAX_IV_LENGTH];
-    const EVP_CIPHER *cipher = EVP_enc_null();
-
-    memset(key, 0xc0c0, 32);
-    memset(iv , 0xb311, 32);
 
     if((infp = fopen(input, "rb")) == NULL){
         printf("fopen \"%s\" error. \n", input);
@@ -258,20 +283,35 @@ int encrypt_file(char *input, char *output, char *algorithm, int flag) {
     if((outfp = fopen(output, "wb")) == NULL){
         printf("fopen \"%s\" error. \n", output);
     }
-    
-    cipher = EVP_get_cipherbyname(algorithm);
 
-    if (!( flag & FLAG_DECRYPT )) {
-        encrypt( infp, outfp, cipher, key, iv );
+    if (flag & FLAG_CIPHER) {
+
+        unsigned char key[EVP_MAX_KEY_LENGTH];
+        unsigned char iv[EVP_MAX_IV_LENGTH];
+        const EVP_CIPHER *cipher = EVP_enc_null();
+
+        memset(key, 0xc0c0, 32);
+        memset(iv , 0xb311, 32);
+
+        cipher = EVP_get_cipherbyname(algorithm);
+
+        if (!( flag & FLAG_DECRYPT )) {
+            encrypt( infp, outfp, cipher, key, iv );
+        }
+        else {
+            decrypt( infp, outfp, cipher, key, iv );
+        }
     }
     else {
-        decrypt( infp, outfp, cipher, key, iv );
+        const EVP_MD *md = EVP_md_null();
+
+        md = EVP_get_digestbyname(algorithm);
+
+        digest(infp, outfp, md);
     }
 
     fclose(infp);
     fclose(outfp);
-
-    return 0;
 
 }
 
