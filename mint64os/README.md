@@ -3,6 +3,7 @@
 ## Reference
 
 ### Textbook
+<img src="https://user-images.githubusercontent.com/48816875/207875200-615d82f1-dd9e-442d-967f-c9f33b94cd67.png" width="300">
 
 - [http://www.yes24.com/Product/Goods/65061299](http://www.yes24.com/Product/Goods/65061299)
 
