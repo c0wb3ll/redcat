@@ -38,6 +38,5 @@ void kCls( const char* pcParameterBuffer );
 void kShowTotalRAMSize( const char* pcParameterBuffer );
 void kStringToDecimalHexTest( const char* pcParameterBuffer);
 void kShutdown( const char* pcParameterBuffer );
-void kSongyi( const char* pcParameterBuffer );
 
 #endif /*__CONSOLE_H__*/
