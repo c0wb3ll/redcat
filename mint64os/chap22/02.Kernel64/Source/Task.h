@@ -102,6 +102,8 @@ typedef struct kTaskControlBlockStruct {
 
     BOOL bFPUUsed;
 
+    char vcPadding[ 11 ];
+
 } TCB;
 
 // TCB 풀의 상태를 관리하는 자료구조
@@ -172,6 +174,6 @@ void kHaltProcessorByLoad( void );
 
 // FPU 관련
 QWORD kGetLastFPUUsedTaskID( void );
-void kSetLastFPUUsedTaskID( QWORD qwTaskID )
+void kSetLastFPUUsedTaskID( QWORD qwTaskID );
 
 #endif /*__TASK_H__*/

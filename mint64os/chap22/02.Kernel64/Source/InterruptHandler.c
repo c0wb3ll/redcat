@@ -5,6 +5,7 @@
 #include "Utility.h"
 #include "Task.h"
 #include "Descriptor.h"
+#include "AssemblyUtility.h"
 
 void kCommonExceptionHandler( int iVectorNumber, QWORD qwErrorCode ) {
 
@@ -117,7 +118,7 @@ void kDeviceNotAvailableHandler( int iVectorNumber ) {
 
         pstFPUTask = kGetTCBInTCBPool( GETTCBOFFSET( qwLastFPUTaskID ) );
 
-        if( ( pstFPUTask != null ) && ( pstFPUTask->stLink.qwID == qwLastFPUTaskID ) ) {
+        if( ( pstFPUTask != NULL ) && ( pstFPUTask->stLink.qwID == qwLastFPUTaskID ) ) {
 
             kSaveFPUContext( pstFPUTask->vqwFPUContext );
 

@@ -380,11 +380,9 @@ void kSchedule( void ) {
 
     } else {
 
-        kClearTS()
+        kClearTS();
 
     }
-
-    gs_stScheduler.iProcessorTime = TASK_PROCESSORTIME;
 
     if( pstRunningTask->qwFlags & TASK_FLAGS_ENDTASK ) {
 
@@ -767,6 +765,6 @@ QWORD kGetLastFPUUsedTaskID( void ) {
 
 void kSetLastFPUUsedTaskID( QWORD qwTaskID ) {
 
-    gs_stScheduler.qwLastFPUUsedTaskID; = qwTaskID;
+    gs_stScheduler.qwLastFPUUsedTaskID = qwTaskID;
 
 }

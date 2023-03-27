@@ -40,12 +40,14 @@ void kStartConsoleShell( void ) {
     int iCursorX, iCursorY;
 
     kPrintf( "==============================================================================\n");
-    kPrintf( "         _ \n" );
-    kPrintf( "     ---(_)\n" );
-    kPrintf( " _/  ---  \\\n" );
-    kPrintf( "(_) |   |         Welcome MINT64OS\n" );
-    kPrintf( "  \\  --- _/\n" );
-    kPrintf( "     ---(_)\n\n" );
+    kPrintf( " ------------------\n" );
+    kPrintf( "< Welcome MIN64OS! >\n");
+    kPrintf( " ------------------\n" );
+    kPrintf( "        \\   ^__^\n" );
+    kPrintf( "         \\  (oo)\_______\n" );
+    kPrintf( "           (__)\       )\\/\\\n" );
+    kPrintf( "                ||----w |\n" );
+    kPrintf( "                ||     ||\n\n" );
     kPrintf( "==============================================================================\n\n");
 
     kPrintf( CONSOLESHELL_PROMPTMESSAGE );

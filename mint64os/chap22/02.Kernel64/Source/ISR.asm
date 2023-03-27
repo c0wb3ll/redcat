@@ -3,7 +3,7 @@
 SECTION .text
 
 extern kCommonExceptionHandler, kCommonInterruptHandler, kKeyboardHandler
-extern kTimerHandler
+extern kTimerHandler, kDeviceNotAvailableHandler
 
 ; C언어에서 호출할 수 있도록 이름을 노출함
 ; 예외(Exception) 처리를 위한 ISR
