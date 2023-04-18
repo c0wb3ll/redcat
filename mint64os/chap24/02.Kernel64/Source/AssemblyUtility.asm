@@ -1,12 +1,13 @@
 [BITS 64]
 
-SECTION .text
-
-global kInPortByte, kOutPortByte, kLoadGDTR, kLoadTR, kLoadIDTR
+global kInPortByte, kOutPortByte, kInPortWord, kOutPortWord
+global kLoadGDTR, kLoadTR, kLoadIDTR
 global kEnableInterrupt, kDisableInterrupt, kReadRFLAGS
 global kReadTSC
 global kSwitchContext, kHlt, kTestAndSet
 global kInitializeFPU, kSaveFPUContext, kLoadFPUContext, kSetTS, kClearTS
+
+SECTION .text
 
 kInPortByte:
 	push rdx
@@ -25,6 +26,30 @@ kOutPortByte:
 	mov rdx, rdi
 	mov rax, rsi
 	out dx, al
+	pop rax
+	pop rdx
+	ret
+
+; 포트로부터 2바이트 읽기
+kInPortWord:
+	push rdx
+
+	mov rdx, rdi
+	mov rax, 0
+	in ax, dx
+
+	pop rdx
+	ret
+
+; 포트에 2바이트 씀
+kOutPortWord:
+	push rdx
+	push rax
+
+	mov rdx, rdi
+	mov rax, rsi
+	out dx, ax
+
 	pop rax
 	pop rdx
 	ret

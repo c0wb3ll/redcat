@@ -3,7 +3,7 @@
 SECTION .text
 
 extern kCommonExceptionHandler, kCommonInterruptHandler, kKeyboardHandler
-extern kTimerHandler, kDeviceNotAvailableHandler
+extern kTimerHandler, kDeviceNotAvailableHandler, kHDDHandler
 
 ; C언어에서 호출할 수 있도록 이름을 노출함
 ; 예외(Exception) 처리를 위한 ISR
@@ -447,7 +447,7 @@ kISRHDD1:
     KSAVECONTEXT
 
     mov rdi, 46
-    call kCommonInterruptHandler
+    call kHDDHandler
 
     KLOADCONTEXT
     iretq
@@ -457,7 +457,7 @@ kISRHDD2:
     KSAVECONTEXT
 
     mov rdi, 47
-    call kCommonInterruptHandler
+    call kHDDHandler
 
     KLOADCONTEXT
     iretq

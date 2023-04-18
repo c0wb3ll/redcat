@@ -6,6 +6,7 @@
 #include "Task.h"
 #include "Descriptor.h"
 #include "AssemblyUtility.h"
+#include "HardDisk.h"
 
 void kCommonExceptionHandler( int iVectorNumber, QWORD qwErrorCode ) {
 
@@ -138,5 +139,34 @@ void kDeviceNotAvailableHandler( int iVectorNumber ) {
     }
 
     kSetLastFPUUsedTaskID( pstCurrentTask->stLink.qwID );
+
+}
+
+// 하드디스크에서 발생하는 인터럽트의 핸들러
+void kHDDHandler( int iVectorNumber ) {
+
+    char vcBuffer[] = "[INT:  , ]";
+    static int g_iHDDInterruptCount = 0;
+    BYTE bTemp;
+
+    vcBuffer[ 5 ] = '0' + iVectorNumber / 10;
+    vcBuffer[ 6 ] = '0' + iVectorNumber % 10;
+
+    vcBuffer[ 8 ] = '0' + g_iHDDInterruptCount;
+    g_iHDDInterruptCount = ( g_iHDDInterruptCount + 1 ) % 10;
+
+    kPrintStringXY( 10, 0, vcBuffer );
+
+    if( iVectorNumber - PIC_IRQSTARTVECTOR == 14 ) {
+
+        kSetHDDInterruptFlag( TRUE, TRUE );
+
+    } else {
+
+        kSetHDDInterruptFlag( FALSE, TRUE );
+
+    }
+
+    kSendEOIToPIC( iVectorNumber - PIC_IRQSTARTVECTOR );
 
 }

@@ -37,3 +37,4 @@
 - 2022.02.xx    Chap#21 Done!
 - 2023.03.27    Chap#22 Done!
 - 2023.04.07    Chap#23 Done!
+- 2023.04.18    Chap#24 Done!
