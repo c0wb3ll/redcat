@@ -9,6 +9,7 @@
 #include "PIT.h"
 #include "DynamicMemory.h"
 #include "HardDisk.h"
+#include "FileSystem.h"
 
 void kPrintString( int iX, int iY, const char* pcString);
 
@@ -83,6 +84,19 @@ void Main( void ) {
     } else {
 
         kSetCursor( 0x14, iCursorY++ );
+        kPrintf( "Fail\n" );
+
+    }
+
+    kPrintf( "[*] File System Initialize [    ]" );
+    if( kInitializeFileSystem() == TRUE ) {
+
+        kSetCursor( 0x1c, iCursorY++ );
+        kPrintf( "Pass\n" );
+
+    } else {
+
+        kSetCursor( 0x1c, iCursorY++ );
         kPrintf( "Fail\n" );
 
     }
