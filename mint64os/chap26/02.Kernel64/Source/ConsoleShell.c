@@ -1784,7 +1784,7 @@ static void kTestFileIO( const char* pcParameterBuffer ) {
         if( fwrite( pbBuffer + ( i * 1024 ), 1, 1024, pstFile ) != 1024 ) {
 
             kPrintf( "      [Fail]\n" );
-            break ;
+            return ;
 
         } else {
 
