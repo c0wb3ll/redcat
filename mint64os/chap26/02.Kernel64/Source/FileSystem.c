@@ -1068,7 +1068,7 @@ int kRemoveFile( const char* pcFileName ) {
     iFileNameLength = kStrLen( pcFileName );
     if( ( iFileNameLength > ( sizeof( stEntry.vcFileName ) - 1 ) ) || ( iFileNameLength == 0 ) ) {
 
-        return -1;
+        return NULL;
 
     }
 
