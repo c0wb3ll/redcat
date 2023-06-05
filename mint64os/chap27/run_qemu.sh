@@ -1,19 +1,16 @@
-O_DEBUG="no"
+O_DEBUG=""
 O_ARCH="x86_64"
+O_DISK=""
 
 while getopts da: opts; do
     case $opts in
-    d) O_DEBUG="yes"
+    v) O_DEBUG="-s -S"
         ;;
     a) O_ARCH=$OPTARG
         ;;
+    d) O_DISK="-hda ${PWD}/HDD.img"
     esac
 done
 
-if [ "${O_DEBUG}" = "yes" ]; then
-    qemu-system-${O_ARCH} -L . -m 64 -fda ${PWD}/Disk.img -hda ${PWD}/HDD.img -rtc base=localtime -M pc -s -S
-fi
-if [ "${O_DEBUG}" = "no" ]; then
-    qemu-img create HDD.img 20M
-    qemu-system-${O_ARCH} -L . -m 64 -fda ${PWD}/Disk.img -hda ${PWD}/HDD.img -rtc base=localtime -M pc
-fi
+qemu-img create HDD.img 20M
+qemu-system-${O_ARCH} -L . -m 64 -fda ${PWD}/Disk.img ${O_DISK} -rtc base=localtime -M pc ${O_DEBUG}
