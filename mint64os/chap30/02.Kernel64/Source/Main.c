@@ -11,12 +11,21 @@
 #include "HardDisk.h"
 #include "FileSystem.h"
 #include "SerialPort.h"
+#include "MultiProcessor.h"
 
-void kPrintString( int iX, int iY, const char* pcString);
+void MainForApplicationProcessor( void );
 
 void Main( void ) {
 
     int iCursorX, iCursorY;
+
+    if( *( ( BYTE* ) BOOTSTRAPPROCESSOR_FLAGADDRESS ) == 0 ) {
+
+        MainForApplicationProcessor();
+
+    }
+
+    *( ( BYTE* ) BOOTSTRAPPROCESSOR_FLAGADDRESS ) = 0;
 
     kInitializeConsole( 0, 10 );
     kPrintf( "[*] Switch To IA-32e Mode Success...\n" );
@@ -95,5 +104,30 @@ void Main( void ) {
 
     kCreateTask( TASK_FLAGS_LOWEST | TASK_FLAGS_THREAD | TASK_FLAGS_SYSTEM | TASK_FLAGS_IDLE, 0, 0, ( QWORD ) kIdleTask );
     kStartConsoleShell();
+
+}
+
+// Application Processor 용 C 언어 커널 엔트리 포인트
+void MainForApplicationProcessor( void ) {
+
+    QWORD qwTickCount;
+    
+    kLoadGDTR( GDTR_STARTADDRESS );
+    kLoadGDTR( GDT_TSSSEGMENT + ( kGetAPICID() * sizeof( GDTENTRY16 ) ) );
+
+    kLoadIDTR( IDTR_STARTADDRESS );
+
+    qwTickCount = kGetTickCount();
+    while( 1 ) {
+
+        if( kGetTickCount() - qwTickCount > 1000 ) {
+
+            qwTickCount = kGetTickCount();
+
+            kPrintf( "Application Processor[APIC ID: %d] is Activated\n", kGetAPICID() );
+
+        }
+
+    }
 
 }

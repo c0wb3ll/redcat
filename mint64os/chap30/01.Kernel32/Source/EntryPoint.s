@@ -9,6 +9,12 @@ START:
     mov ds, ax
     mov es, ax
 
+    mov ax, 0x0000
+    mov es, ax
+
+    cmp byte [ es: 0x7C09 ], 0x00
+    je .APPLICATIONPROCESSORSTARTPOINT
+
     mov ax, 0x2401
     int 0x15
 
@@ -22,6 +28,7 @@ START:
     out 0x92, al
 
 .A20GATESUCCESS:
+.APPLICATIONPROCESSORSTARTPOINT:
     cli
     lgdt[GDTR]
 
@@ -42,12 +49,16 @@ PROTECTEDMODE:
     mov esp, 0xfffc
     mov ebp, 0xfffc
 
+    cmp byte [ 0x7C09 ], 0x00
+    je .APPLICATIONPROCESSORSTARTPOINT
+
     push (SWITCHSUCCESSMESSAGE - $$ + 0x10000)
     push 0x02
     push 0
     call PRINTMESSAGE
     add esp, 12
 
+.APPLICATIONPROCESSORSTARTPOINT:
     jmp dword 0x18: 0x10200
 
 PRINTMESSAGE:

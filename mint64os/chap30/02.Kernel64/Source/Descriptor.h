@@ -32,9 +32,9 @@
 
 #define GDTR_STARTADDRESS           0x142000
 #define GDT_MAXENTRY8COUNT          0x3
-#define GDT_MAXENTRY16COUNT         0x1
+#define GDT_MAXENTRY16COUNT         ( MAXPROCESSORCOUNT )
 #define GDT_TABLESIZE               ( ( sizeof( GDTENTRY8 ) * GDT_MAXENTRY8COUNT ) + ( sizeof( GDTENTRY16 ) * GDT_MAXENTRY16COUNT ) )
-#define TSS_SEGMENTSIZE             ( sizeof( TSSSEGMENT ) )
+#define TSS_SEGMENTSIZE             ( sizeof( TSSSEGMENT ) * MAXPROCESSORCOUNT )
 
 #define IDT_TYPE_INTERRUPT          0x0E
 #define IDT_TYPE_TRAP               0x0F

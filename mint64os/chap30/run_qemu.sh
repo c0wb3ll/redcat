@@ -1,7 +1,7 @@
 O_DEBUG=""
 O_ARCH="x86_64"
 O_DISK="-hda ${PWD}/HDD.img"
-O_SINGLE_CORE="-smp 2,sockets=2"
+O_SINGLE_CORE="-smp 16,sockets=16"
 
 while getopts da: opts; do
     case $opts in
@@ -17,4 +17,4 @@ while getopts da: opts; do
 done
 
 qemu-img create HDD.img 20M
-qemu-system-${O_ARCH} -L . -m 64 -fda ${PWD}/Disk.img ${O_DISK} -rtc base=localtime -M pc -serial tcp::4444,server,nowait ${O_SINGLE_CORE} ${O_DEBUG}
+qemu-system-${O_ARCH} -L . -m 64 -fda ${PWD}/Disk.img ${O_DISK} -boot a -rtc base=localtime -M pc -serial tcp::4444,server,nowait ${O_SINGLE_CORE} ${O_DEBUG}
