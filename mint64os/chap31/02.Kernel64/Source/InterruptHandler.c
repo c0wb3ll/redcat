@@ -21,7 +21,7 @@ void kCommonExceptionHandler( int iVectorNumber, QWORD qwErrorCode ) {
     kPrintStringXY( 31, 2, vcBuffer );
     kPrintStringXY( 0, 3, "==================================================");
 
-    while ( 1 );
+    while( 1 );
 
 }
 
@@ -32,12 +32,13 @@ void kCommonInterruptHandler( int iVectorNumber ) {
 
     vcBuffer[ 5 ] = '0' + iVectorNumber / 10;
     vcBuffer[ 6 ] = '0' + iVectorNumber % 10;
-
     vcBuffer[ 8 ] = '0' + g_iCommonInterruptCount;
     g_iCommonInterruptCount = ( g_iCommonInterruptCount + 1 ) % 10;
-    kPrintStringXY( 70, 0, vcBuffer);
+    kPrintStringXY( 70, 0, vcBuffer );
 
     kSendEOIToPIC( iVectorNumber - PIC_IRQSTARTVECTOR );
+
+    kSendEOIToLocalAPIC();
 
 }
 
@@ -49,10 +50,9 @@ void kKeyboardHandler( int iVectorNumber ) {
 
     vcBuffer[ 5 ] = '0' + iVectorNumber / 10;
     vcBuffer[ 6 ] = '0' + iVectorNumber % 10;
-
     vcBuffer[ 8 ] = '0' + g_iKeyboardInterruptCount;
     g_iKeyboardInterruptCount = ( g_iKeyboardInterruptCount + 1 ) % 10;
-    kPrintStringXY( 0, 0, vcBuffer);
+    kPrintStringXY( 0, 0, vcBuffer );
 
     if( kIsOutputBufferFull() == TRUE ) {
 
@@ -62,6 +62,8 @@ void kKeyboardHandler( int iVectorNumber ) {
     }
 
     kSendEOIToPIC( iVectorNumber - PIC_IRQSTARTVECTOR );
+
+    kSendEOIToLocalAPIC();
 
 }
 
@@ -78,6 +80,8 @@ void kTimerHandler( int iVectorNumber ) {
     kPrintStringXY( 70, 0, vcBuffer );
 
     kSendEOIToPIC( iVectorNumber - PIC_IRQSTARTVECTOR );
+
+    kSendEOIToLocalAPIC();
 
     g_qwTickCount++;
 
@@ -151,22 +155,15 @@ void kHDDHandler( int iVectorNumber ) {
 
     vcBuffer[ 5 ] = '0' + iVectorNumber / 10;
     vcBuffer[ 6 ] = '0' + iVectorNumber % 10;
-
     vcBuffer[ 8 ] = '0' + g_iHDDInterruptCount;
     g_iHDDInterruptCount = ( g_iHDDInterruptCount + 1 ) % 10;
 
     kPrintStringXY( 10, 0, vcBuffer );
 
-    if( iVectorNumber - PIC_IRQSTARTVECTOR == 14 ) {
-
-        kSetHDDInterruptFlag( TRUE, TRUE );
-
-    } else {
-
-        kSetHDDInterruptFlag( FALSE, TRUE );
-
-    }
+    kSetHDDInterruptFlag( TRUE, TRUE );
 
     kSendEOIToPIC( iVectorNumber - PIC_IRQSTARTVECTOR );
+
+    kSendEOIToLocalAPIC();
 
 }

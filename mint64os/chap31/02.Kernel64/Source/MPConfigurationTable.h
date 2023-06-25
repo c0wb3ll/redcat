@@ -56,13 +56,13 @@ typedef struct kMPConfigurationTableHeaderStruct {
     BYTE bRevision;
     BYTE bCheckSum;
     char vcOEMIDString[ 8 ];
-    char vcProductIDString [ 12 ];
+    char vcProductIDString[ 12 ];
     DWORD dwOEMTablePointerAddress;
     WORD wOEMTableSize;
     WORD wEntryCount;
     DWORD dwMemoryMapIOAddressOfLocalAPIC;
     WORD wExtendedTableLength;
-    BYTE bExtendedTableCheckSum;
+    BYTE bExtendedTableChecksum;
     BYTE bReserved;
 
 } MPCONFIGURATIONTABLEHEADER;
@@ -145,6 +145,7 @@ BOOL kFindMPFloatingPointerAddress( QWORD* pstAddress );
 BOOL kAnalysisMPConfigurationTable( void );
 MPCONFIGURATIONMANAGER* kGetMPConfigurationManager( void );
 void kPrintMPConfigurationTable( void );
-int kGgetProcessorCount( void );
+int kGetProcessorCount( void );
+IOAPICENTRY* kFindIOAPICEntryForISA( void );
 
 #endif /*__MPCONFIGURATIONTABLE__*/

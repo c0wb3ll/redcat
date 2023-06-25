@@ -14,6 +14,7 @@
 #include "MPConfigurationTable.h"
 #include "LocalAPIC.h"
 #include "MultiProcessor.h"
+#include "IOAPIC.h"
 
 SHELLCOMMANDENTRY gs_vstCommandTable[] = {
 
@@ -56,6 +57,8 @@ SHELLCOMMANDENTRY gs_vstCommandTable[] = {
     { "download", "Download Data From Serial, ex) download a.txt", kDownloadFile },
     { "showmpinfo", "Show MP Configuration Table Information", kShowMPConfigurationTable },
     { "startap", "Start Application Processor", kStartApplicationProcessor },
+    { "startsymmetricio", "Start Symmetric I/O Mode", kStartSymmetricIOMode },
+    { "showirqintinmap", "Show IRQ->INTIN Mapping Table", kShowIRQINTINMappingTable },
 
 };
 
@@ -2163,5 +2166,59 @@ static void kStartApplicationProcessor( const char* pcParameterBuffer ) {
     kPrintf( "Application Processor Start Success\n" );
 
     kPrintf( "Bootstrap Processor[APIC ID: %d] Start Application Processor\n", kGetAPICID() );
+
+}
+
+// 대칭 I/O 모드 (Symmetric I/O Mode)로 전환
+static void kStartSymmetricIOMode( const char* pcParameterBuffer ) {
+
+    MPCONFIGURATIONMANAGER* pstMPManager;
+    BOOL bInterruptFlag;
+
+    if( kAnalysisMPConfigurationTable() == FALSE ) {
+
+        kPrintf( "Analyze MP Configuration Table Fail\n" );
+        return ;
+
+    }
+
+    pstMPManager = kGetMPConfigurationManager();
+    if( pstMPManager->bUsePICMode == TRUE ) {
+
+        kOutPortByte( 0x22, 0x70 );
+        kOutPortByte( 0x23, 0x01 );
+
+    }
+
+    kPrintf( "Mask All PIC Controller Interrupt\n" );
+    kMaskPICInterrupt( 0xFFFF );
+
+    kPrintf( "Enable Global Local APIC\n" );
+    kEnableGlobalLocalAPIC();
+
+    kPrintf( "Enable Software Local APIC\n" );
+    kEnableSoftwareLocalAPIC();
+
+    kPrintf( "Disable CPU Interrupt Flag\n" );
+    bInterruptFlag = kSetInterruptFlag( FALSE );
+
+    kSetTaskPriority( 0 );
+
+    kInitializeLocalVectorTable();
+
+    kPrintf( "Initialize IO Redirection Table\n" );
+    kInitializeIORedirectionTable();
+
+    kPrintf( "Restore CPU Interrupt Flag\n" );
+    kSetInterruptFlag( bInterruptFlag );
+
+    kPrintf( "Change Symmetric I/O Mode Complete\n" );
+
+}
+
+// IRQ와 I/O APIC의 인터럽트 입력 핀(INTIN)의 관계를 저장한 테이블을 표시
+static void kShowIRQINTINMappingTable( const char* pcParameterBuffer ) {
+
+    kPrintIRQToINTINMap();
 
 }

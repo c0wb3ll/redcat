@@ -117,14 +117,22 @@ void MainForApplicationProcessor( void ) {
 
     kLoadIDTR( IDTR_STARTADDRESS );
 
+    kEnableSoftwareLocalAPIC();
+
+    kSetTaskPriority( 0 );
+
+    kInitializeLocalVectorTable();
+
+    kEnableInterrupt();
+
+    kPrintf( "Application Processor[APIC ID: %d] is Activated\n", kGetAPICID() );
+
     qwTickCount = kGetTickCount();
     while( 1 ) {
 
         if( kGetTickCount() - qwTickCount > 1000 ) {
 
             qwTickCount = kGetTickCount();
-
-            kPrintf( "Application Processor[APIC ID: %d] is Activated\n", kGetAPICID() );
 
         }
 
