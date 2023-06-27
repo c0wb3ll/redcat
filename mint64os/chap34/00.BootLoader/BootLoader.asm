@@ -5,9 +5,10 @@ SECTION .text
 
 jmp 0x07C0:START
 
-TOTALSECTORCOUNT: dw 0x02
-KERNEL32SECTORCOUNT: dw 0x02
-BOOTSTRAPPROCESSOR: db 0x01
+TOTALSECTORCOUNT:       dw 0x02
+KERNEL32SECTORCOUNT:    dw 0x02
+BOOTSTRAPPROCESSOR:     db 0x01
+STARTGRAPHICMODE:       db 0x01
 
 START:
     mov ax, 0x07C0
@@ -93,6 +94,37 @@ READEND:
     call PRINTMESSAGE
     add sp, 6
 
+    ; vbe
+    mov ax, 0x4F01
+    mov cx, 0x117
+    mov bx, 0x07E0
+    mov es, bx
+    mov di, 0x00
+    int 0x10
+    cmp ax, 0x004F
+    jne VBEERROR
+
+    cmp byte [ STARTGRAPHICMODE ], 0x00
+    je JUMPTOPROTECTEDMODE
+
+    mov ax, 0x4F02
+    mov bx, 0x4117
+
+    int 0x10
+    cmp ax, 0x004F
+    jne VBEERROR
+
+    jmp JUMPTOPROTECTEDMODE
+
+VBEERROR:
+    push CHANGEGRAPHICMODEFAIL
+    push 2
+    push 0
+    call PRINTMESSAGE
+    add sp, 6
+    jmp $
+
+JUMPTOPROTECTEDMODE:
     jmp 0x1000:0x0000
 
 HANDLEDISKERROR:
@@ -152,14 +184,15 @@ PRINTMESSAGE:
     pop bp
     ret
 
-MESSAGE1: db "[*] MINT64 OS Boot Loader Start~!!", 0x00
-DISKERRORMESSAGE: db "[*] DISK ERROR~!!", 0x00
-IMAGELOADINGMESSAGE: db "[*] OS Image Loading...", 0x00
-LOADINGCOMPLETEMESSAGE: db "Complete", 0x00
+MESSAGE1:                   db "[*] MINT64 OS Boot Loader Start~!!", 0
+DISKERRORMESSAGE:           db "[*] DISK ERROR~!!", 0
+IMAGELOADINGMESSAGE:        db "[*] OS Image Loading...", 0
+LOADINGCOMPLETEMESSAGE:     db "Complete", 0
+CHANGEGRAPHICMODEFAIL:      db "Change Graphic Mode Fail..."", 0
 
-SECTORNUMBER: db 0x02
-HEADNUMBER: db 0x00
-TRACKNUMBER: db 0x00
+SECTORNUMBER:   db 0x02
+HEADNUMBER:     db 0x00
+TRACKNUMBER:    db 0x00
 
 times 510 - ($ - $$) db 0x00
 
