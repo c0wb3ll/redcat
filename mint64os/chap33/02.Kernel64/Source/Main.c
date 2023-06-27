@@ -66,13 +66,13 @@ void Main( void ) {
 
     kPrintf( "[*] Keyboard Activate And Queue Initialize [    ]" );
 
-    if( kInitializeKeyboard() == TRUE) {
+    if( kInitializeKeyboard() == TRUE ) {
         kSetCursor( 44, iCursorY++ );
         kPrintf( "Pass\n" );
         kChangeKeyboardLED( FALSE, FALSE, FALSE );
     }
     else{
-        kPrintf( 44, iCursorY++ );
+        kSetCursor( 44, iCursorY++ );
         kPrintf( "Fail\n" );
         while( 1 );
     }
@@ -101,7 +101,7 @@ void Main( void ) {
     iCursorY++;
     kInitializeSerialPort();
 
-    kCreateTask( TASK_FLAGS_LOWEST | TASK_FLAGS_THREAD | TASK_FLAGS_SYSTEM | TASK_FLAGS_IDLE, 0, 0, ( QWORD ) kIdleTask );
+    kCreateTask( TASK_FLAGS_LOWEST | TASK_FLAGS_THREAD | TASK_FLAGS_SYSTEM | TASK_FLAGS_IDLE, 0, 0, ( QWORD ) kIdleTask, kGetAPICID() );
     kStartConsoleShell();
 
 }
@@ -116,6 +116,8 @@ void MainForApplicationProcessor( void ) {
 
     kLoadIDTR( IDTR_STARTADDRESS );
 
+    kInitializeScheduler();
+
     kEnableSoftwareLocalAPIC();
 
     kSetTaskPriority( 0 );
@@ -126,15 +128,6 @@ void MainForApplicationProcessor( void ) {
 
     kPrintf( "Application Processor[APIC ID: %d] is Activated\n", kGetAPICID() );
 
-    qwTickCount = kGetTickCount();
-    while( 1 ) {
-
-        if( kGetTickCount() - qwTickCount > 1000 ) {
-
-            qwTickCount = kGetTickCount();
-
-        }
-
-    }
+    kIdleTask();
 
 }
