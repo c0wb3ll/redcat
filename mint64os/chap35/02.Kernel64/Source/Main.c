@@ -12,6 +12,7 @@
 #include "SerialPort.h"
 #include "MultiProcessor.h"
 #include "VBE.h"
+#include "2DGraphics.h"
 
 void MainForApplicationProcessor( void );
 // 그래픽 모드 테스트 함수
@@ -144,37 +145,206 @@ void MainForApplicationProcessor( void ) {
 
 }
 
+// x를 절대값으로 변환하는 매크로
+#define ABS( x )    ( ( ( x ) >= 0 ) ? ( x ) : -( x ) )
+
+// 임의의 XY 좌표 반환
+void kGetRandomXY( int *piX, int *piY) {
+
+    int iRandom;
+
+    iRandom = kRandom();
+    *piX = ABS( iRandom ) % 1000;
+
+    iRandom = kRandom();
+    *piY = ABS( iRandom ) % 700;
+
+}
+
+// 임의의 색 반환
+COLOR kGetRandomColor( void ) {
+
+    int iR, iG, iB;
+    int iRandom;
+
+    iRandom = kRandom();
+    iR = ABS( iRandom ) % 256;
+
+    iRandom = kRandom();
+    iG = ABS( iRandom ) % 256;
+
+    iRandom = kRandom();
+    iB = ABS( iRandom ) % 256;
+
+    return RGB( iR, iG, iB );
+
+}
+
+// 윈도우 프레임 그리기
+void kDrawWindowFrame( int iX, int iY, int iWidth, int iHeight, const char* pcTitle ) {
+
+    char* pcTestString1 = "This is MINT64 OS's Window prototype";
+    char* pcTestString2 = "c0wb3ll";
+
+    // 윈도우 프레임 가장자리
+    kDrawRect( iX, iY, iX + iWidth, iY + iHeight, RGB( 109, 218, 22 ), FALSE );
+    kDrawRect( iX + 1, iY + 1, iX + iWidth - 1, iY + iHeight - 1, RGB( 109, 218, 22 ), FALSE );
+
+    // 제목 표시줄 지움
+    kDrawRect( iX, iY + 3, iX + iWidth - 1, iY + 21, RGB( 79, 204, 11 ), TRUE );
+
+    // 윈도우 제목 표시
+    kDrawText( iX + 6, iY + 3, RGB( 255, 255, 255 ), RGB( 79, 204, 11 ), pcTitle, kStrLen( pcTitle ) );
+
+    // 제목 표시줄을 입체로 보이게
+    kDrawLine( iX + 1, iY + 1, iX + iWidth - 1, iY + 1, RGB( 183, 249, 171 ) );
+    kDrawLine( iX + 1, iY + 2, iX + iWidth - 1, iY + 2, RGB( 150, 210, 140 ) );
+
+    kDrawLine( iX + 1, iY + 2, iX + 1, iY + 20, RGB( 183, 249, 171 ) );
+    kDrawLine( iX + 2, iY + 2, iX + 2, iY + 20, RGB( 150, 210, 140 ) );
+
+    // 제목 표시줄 아래 선
+    kDrawLine( iX + 2, iY + 19, iX + iWidth - 2, iY + 19, RGB( 46, 59, 30 ) );
+    kDrawLine( iX + 2, iY + 20, iX + iWidth - 2, iY + 20, RGB( 46, 59, 30 ) );
+
+    // 닫기 버튼 그리기
+    kDrawRect( iX + iWidth - 2 - 18, iY + 1, iX + iWidth - 2, iY + 19, RGB( 255, 255, 255 ), TRUE );
+
+    // 닫기 버튼을 입체로 보이게
+    kDrawRect( iX + iWidth - 2, iY + 1, iX + iWidth - 2, iY + 19 - 1, RGB( 86, 86, 86 ), TRUE );
+    kDrawRect( iX + iWidth - 2 - 1, iY + 1, iX + iWidth - 2 - 1, iY + 19 - 1, RGB( 86, 86, 86 ), TRUE );
+    kDrawRect( iX + iWidth - 2 - 18 + 1, iY + 19, iX + iWidth - 2, iY + 19, RGB( 86, 86, 86 ), TRUE );
+    kDrawRect( iX + iWidth - 2 - 18 + 1, iY + 19 - 1, iX + iWidth - 2, iY + 19 - 1, RGB( 86, 86, 86 ), TRUE );
+
+    kDrawLine( iX + iWidth - 2 - 18, iY + 1, iX + iWidth - 2 - 1, iY + 1, RGB( 229, 229, 229 ) );
+    kDrawLine( iX + iWidth - 2 - 18, iY + 1 + 1, iX + iWidth - 2 - 2, iY + 1 + 1, RGB( 229, 229, 229 ) );
+    kDrawLine( iX + iWidth - 2 - 18, iY + 1, iX + iWidth - 2 - 18, iY + 19, RGB( 229, 229, 229 ) );
+    kDrawLine( iX + iWidth - 2 - 18 + 1, iY + 1, iX + iWidth - 2 - 18 + 1, iY + 19 - 1, RGB( 229, 229, 229 ) );
+
+    // 대각선 x를 그림
+    kDrawLine( iX + iWidth - 2 - 18 + 4, iY + 1 + 4, iX + iWidth - 2 - 4, iY + 19 - 4, RGB( 71, 199, 21 ) );
+    kDrawLine( iX + iWidth - 2 - 18 + 5, iY + 1 + 4, iX + iWidth - 2 - 4, iY + 19 - 5, RGB( 71, 199, 21 ) );
+    kDrawLine( iX + iWidth - 2 - 18 + 4, iY + 1 + 5, iX + iWidth - 2 - 5, iY + 19 - 4, RGB( 71, 199, 21 ) );
+    kDrawLine( iX + iWidth - 2 - 18 + 4, iY + 19 - 4, iX + iWidth - 2 - 4, iY + 1 + 4, RGB( 71, 199, 21 ) );
+    kDrawLine( iX + iWidth - 2 - 18 + 5, iY + 19 - 4, iX + iWidth - 2 - 4, iY + 1 + 5, RGB( 71, 199, 21 ) );
+    kDrawLine( iX + iWidth - 2 - 18 + 4, iY + 19 - 5, iX + iWidth - 2 - 5, iY + 1 + 4, RGB( 71, 199, 21 ) );
+
+    // 내부를 그림
+    kDrawRect( iX + 2, iY + 21, iX + iWidth - 2, iY + iHeight - 2, RGB( 255, 255, 255 ), TRUE );
+
+    // 테스트 문자 출력
+    kDrawText( iX + 10, iY + 30, RGB( 0, 0, 0 ), RGB( 255, 255, 255 ), pcTestString1, kStrLen( pcTestString1 ) );
+    kDrawText( iX + 10, iY + 50, RGB( 0, 0, 0 ), RGB( 255, 255, 255 ), pcTestString2, kStrLen( pcTestString2 ) );
+
+}
+
 void kStartGraphicModeTest() {
 
     VBEMODEINFOBLOCK* pstVBEMode;
-    WORD* pwFrameBufferAddress;
-    WORD wColor = 0;
-    int iBandHeight;
+    int iX1, iY1, iX2, iY2;
+    COLOR stColor1, stColor2;
     int i;
-    int j;
+    char* vpcString[] = { "Pixel", "Line", "Rectangle", "Circle", "MINT64 OS", "c0wb3ll" };
+
+    // (0, 0)에 Pixel이란 문자열을 검은색 바탕에 흰색으로 출력
+    kDrawText( 0, 0, RGB( 255, 255, 255), RGB( 0, 0, 0 ), vpcString[ 0 ], kStrLen( vpcString[ 0 ] ) );
+    // 픽셀을 (1, 20), (2, 20)에 흰색으로 출력
+    kDrawPixel( 1, 20, RGB( 255, 255, 255 ) );
+    kDrawPixel( 2, 20, RGB( 255, 255, 255 ) );
+
+    // (0, 25)에 Line이란 문자열을 검은색 바탕에 빨간색으로 출력
+    kDrawText( 0, 25, RGB( 255, 0, 0), RGB( 0, 0, 0 ), vpcString[ 1 ], kStrLen( vpcString[ 1 ] ) );
+    // (20, 50)을 중심으로 (1000, 50) (1000, 100), (1000, 150), (1000, 200), 
+    // (1000, 250)까지 빨간색으로 출력
+    kDrawLine( 20, 50, 1000, 50, RGB( 255, 0, 0 ) );
+    kDrawLine( 20, 50, 1000, 100, RGB( 255, 0, 0 ) );
+    kDrawLine( 20, 50, 1000, 150, RGB( 255, 0, 0 ) );
+    kDrawLine( 20, 50, 1000, 200, RGB( 255, 0, 0 ) );
+    kDrawLine( 20, 50, 1000, 250, RGB( 255, 0, 0 ) );
+
+    // (0, 180)에 Rectangle이란 문자열을 검은색 바탕에 녹색으로 출력
+    kDrawText( 0, 180, RGB( 0, 255, 0), RGB( 0, 0, 0 ), vpcString[ 2 ], kStrLen( vpcString[ 2 ] ) );
+    // (20, 200)에서 시작하여 길이가 각각 50, 100, 150, 200인 사각형을 녹색으로 출력
+    kDrawRect( 20, 200, 70, 250, RGB( 0, 255, 0 ), FALSE );
+    kDrawRect( 120, 200, 220, 300, RGB( 0, 255, 0 ), TRUE );
+    kDrawRect( 270, 200, 420, 350, RGB( 0, 255, 0 ), FALSE );
+    kDrawRect( 470, 200, 670, 400, RGB( 0, 255, 0 ), TRUE );
+
+    // (0, 550)에 Circle이란 문자열을 검은색 바탕에 파란색으로 출력
+    kDrawText( 0, 550, RGB( 0, 0, 255), RGB( 0, 0, 0 ), vpcString[ 3 ], kStrLen( vpcString[ 3 ] ) );
+    // (45, 600)에서 시작하여 반지름이 25, 50, 75, 100인 원을 파란색으로 출력
+    kDrawCircle( 45, 600, 25, RGB( 0, 0, 255 ), FALSE ) ;
+    kDrawCircle( 170, 600, 50, RGB( 0, 0, 255 ), TRUE ) ;
+    kDrawCircle( 345, 600, 75, RGB( 0, 0, 255 ), FALSE ) ;
+    kDrawCircle( 570, 600, 100, RGB( 0, 0, 255 ), TRUE ) ;
 
     kGetCh();
 
-    pstVBEMode = kGetVBEModeInfoBlock();
-    pwFrameBufferAddress = ( WORD* ) ( ( QWORD ) pstVBEMode->dwPhysicalBasePointer );
+    do {
 
-    iBandHeight = pstVBEMode->wYResolution / 32;
+        // 점 그리기
+        for( i = 0; i < 100; i++ ) {
+
+            kGetRandomXY( &iX1, &iY1 );
+            stColor1 = kGetRandomColor();
+
+            kDrawPixel( iX1, iY1, stColor1 );
+
+        }
+
+        // 선 그리기
+        for( i = 0; i < 100; i++ ) {
+
+            kGetRandomXY( &iX1, &iY1 );
+            kGetRandomXY( &iX2, &iY2 );
+            stColor1 = kGetRandomColor();
+
+            kDrawLine( iX1, iY1, iX2, iY2, stColor1 );
+
+        }
+
+        // 사각형 그리기
+        for( i = 0; i < 20; i++ ) {
+
+            kGetRandomXY( &iX1, &iY1 );
+            kGetRandomXY( &iX2, &iY2 );
+            stColor1 = kGetRandomColor();
+
+            kDrawRect( iX1, iY1, iX2, iY2, stColor1, kRandom() % 2 );
+
+        }
+
+        // 원 그리기
+        for( i = 0; i < 100; i++ ) {
+
+            kGetRandomXY( &iX1, &iY1 );
+            stColor1 = kGetRandomColor();
+
+            kDrawCircle( iX1, iY1, ABS( kRandom() % 50 + 1 ), stColor1, kRandom() % 2 );
+
+        }
+
+        for( i = 0; i < 100; i++ ) {
+
+            kGetRandomXY( &iX1, &iY1 );
+            stColor1 = kGetRandomColor();
+            stColor2 = kGetRandomColor();
+
+            kDrawText( iX1, iY1, stColor1, stColor2, vpcString[ 5 ], kStrLen( vpcString[ 5 ] ) );
+
+        }
+
+    } while( kGetCh() != 'q' );
 
     while( 1 ) {
 
-        for( j = 0; j < pstVBEMode->wYResolution; j++ ) {
+        // 배경 출력
+        kDrawRect( 0, 0, 1024, 768, RGB( 232, 255, 232 ), TRUE );
 
-            for( i = 0; i < pstVBEMode->wXResolution; i++ ) {
+        for( i = 0; i < 3; i++ ) {
 
-                pwFrameBufferAddress[ ( j * pstVBEMode->wXResolution ) + i ] = wColor;
-
-            }
-
-            if( ( j % iBandHeight ) == 0 ) {
-
-                wColor = kRandom() & 0xFFFF;
-
-            }
+            kGetRandomXY( &iX1, &iY1 );
+            kDrawWindowFrame( iX1, iY1, 400, 200, "Mint64 OS Test Window" );
 
         }
 
