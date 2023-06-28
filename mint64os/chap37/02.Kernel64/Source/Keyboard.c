@@ -32,6 +32,7 @@ BOOL kWaitForACKAndPutOtherScanCode( void ) {
     int i, j;
     BYTE bData;
     BOOL bResult = FALSE;
+    BOOL bMouseData;
 
     for( j = 0; j < 100; j++ ) {
         for( i = 0; i < 0xFFFF; i++ ) {
@@ -43,13 +44,36 @@ BOOL kWaitForACKAndPutOtherScanCode( void ) {
 
         }
 
+        if( kIsMouseDataInOutputBuffer() == TRUE ) {
+
+            bMouseData = TRUE;
+
+        } else {
+
+            bMouseData = FALSE;
+
+        }
+
         bData = kInPortByte( 0x60 );
         if( bData == 0xFA ) { 
+
             bResult = TRUE;
             break;
+
         } else {
-            kConvertScanCodeAndPutQueue( bData );
+
+            if( bMouseData == FALSE ) {
+
+                kConvertScanCodeAndPutQueue( bData );
+
+            } else {
+
+                kAccumulateMouseDataAndPutQueue( bData );
+
+            }
+
         }
+
     }
 
     return bResult;

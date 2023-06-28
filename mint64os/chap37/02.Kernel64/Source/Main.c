@@ -13,14 +13,22 @@
 #include "MultiProcessor.h"
 #include "VBE.h"
 #include "2DGraphics.h"
+#include "MPConfigurationTable.h"
+#include "Mouse.h"
 
+// Application Processor를 위한 메인 함수
 void MainForApplicationProcessor( void );
+// 멀티코어 프로세서 또는 멀티 프로세서 모드로 전환하는 함수
+BOOL kChangeToMultiCoreMode( void );
 // 그래픽 모드 테스트 함수
-void kStartGraphicModeTest();
+void kStartGraphicModeTest( void );
 
 void Main( void ) {
 
     int iCursorX, iCursorY;
+    BYTE bButton;
+    int iX;
+    int iY;
 
     if( *( ( BYTE* ) BOOTSTRAPPROCESSOR_FLAGADDRESS ) == 0 ) {
 
@@ -81,6 +89,21 @@ void Main( void ) {
         while( 1 );
     }
 
+    kPrintf( "[*] Mouse Activate And Queue Initialize [    ]" );
+    if( kInitializeMouse() == TRUE ) {
+
+        kEnableMouseInterrupt();
+        kSetCursor( 41, iCursorY++ );
+        kPrintf( "Pass\n" );
+
+    } else {
+
+        kSetCursor( 41, iCursorY++ );
+        kPrintf( "Fail\n" );
+        while( 1 );
+
+    }
+
     kPrintf( "[*] PIC Controller And Interrupt Initialize [    ]");
     kInitializePIC();
     kMaskPICInterrupt( 0 );
@@ -104,6 +127,19 @@ void Main( void ) {
     kPrintf( "[*] Serial Port Initialize [Pass]\n" );
     iCursorY++;
     kInitializeSerialPort();
+
+    kPrintf( "[*] Change To MultiCore Processor Mode [    ]" );
+    if( kChangeToMultiCoreMode() == TRUE ) {
+
+        kSetCursor( 40, iCursorY++ );
+        kPrintf( "Pass\n" );
+
+    } else {
+
+        kSetCursor( 40, iCursorY++ );
+        kPrintf( "Fail\n" );
+
+    }
 
     kCreateTask( TASK_FLAGS_LOWEST | TASK_FLAGS_THREAD | TASK_FLAGS_SYSTEM | TASK_FLAGS_IDLE, 0, 0, ( QWORD ) kIdleTask, kGetAPICID() );
 
@@ -139,44 +175,60 @@ void MainForApplicationProcessor( void ) {
 
     kEnableInterrupt();
 
-    kPrintf( "Application Processor[APIC ID: %d] is Activated\n", kGetAPICID() );
+    // kPrintf( "Application Processor[APIC ID: %d] is Activated\n", kGetAPICID() );
 
     kIdleTask();
 
 }
 
-// x를 절대값으로 변환하는 매크로
-#define ABS( x )    ( ( ( x ) >= 0 ) ? ( x ) : -( x ) )
+// 멀티코어 프로세서 또는 멀티프로세서 모드로 전환하는 함수
+BOOL kChangeToMultiCoreMode( void ) {
 
-// 임의의 XY 좌표 반환
-void kGetRandomXY( int *piX, int *piY) {
+    MPCONFIGURATIONMANAGER* pstMPManager;
+    BOOL bInterruptFlag;
+    int i;
 
-    int iRandom;
+    if( kStartUpApplicationProcessor() == FALSE ) {
 
-    iRandom = kRandom();
-    *piX = ABS( iRandom ) % 1000;
+        return FALSE;
 
-    iRandom = kRandom();
-    *piY = ABS( iRandom ) % 700;
+    }
 
-}
+    pstMPManager = kGetMPConfigurationManager();
+    if( pstMPManager->bUsePICMode == TRUE ) {
 
-// 임의의 색 반환
-COLOR kGetRandomColor( void ) {
+        kOutPortByte( 0x22, 0x70 );
+        kOutPortByte( 0x23, 0x01 );
 
-    int iR, iG, iB;
-    int iRandom;
+    }
 
-    iRandom = kRandom();
-    iR = ABS( iRandom ) % 256;
+    kMaskPICInterrupt( 0xFFFF );
 
-    iRandom = kRandom();
-    iG = ABS( iRandom ) % 256;
+    kEnableGlobalLocalAPIC();
 
-    iRandom = kRandom();
-    iB = ABS( iRandom ) % 256;
+    kEnableSoftwareLocalAPIC();
 
-    return RGB( iR, iG, iB );
+    bInterruptFlag = kSetInterruptFlag( FALSE );
+
+    kSetTaskPriority( 0 );
+
+    kInitializeLocalVectorTable();
+
+    kSetSymmetricIOMode( TRUE );
+
+    kInitializeIORedirectionTable();
+
+    kSetInterruptFlag( bInterruptFlag );
+
+    kSetInterruptLoadBalancing( TRUE );
+
+    for( i = 0; i < MAXPROCESSORCOUNT; i++ ) {
+
+        kSetTaskLoadBalancing( i, TRUE );
+
+    }
+
+    return TRUE;
 
 }
 
@@ -199,66 +251,136 @@ void kDrawWindowFrame( int iX, int iY, int iWidth, int iHeight, const char* pcTi
     pstVideoMemory = ( COLOR* ) ( ( QWORD )pstVBEMode->dwPhysicalBasePointer & 0xFFFFFFFF );
 
     // 윈도우 프레임 가장자리
-    kInternalDrawRect( &stScreenArea, pstVideoMemory, iX, iY, iX + iWidth, iY + iHeight, RGB( 109, 218, 22 ), FALSE );
-    kInternalDrawRect( &stScreenArea, pstVideoMemory, iX + 1, iY + 1, iX + iWidth - 1, iY + iHeight - 1, RGB( 109, 218, 22 ), FALSE );
+    kInternalDrawRect( &stScreenArea, pstVideoMemory, iX, iY, iX + iWidth, iY + iHeight, RGB( 255, 255, 255 ), FALSE );
+    kInternalDrawRect( &stScreenArea, pstVideoMemory, iX + 1, iY + 1, iX + iWidth - 1, iY + iHeight - 1, RGB( 255, 255, 255 ), FALSE );
 
-    // 제목 표시줄 지움
-    kInternalDrawRect( &stScreenArea, pstVideoMemory, iX, iY + 3, iX + iWidth - 1, iY + 21, RGB( 79, 204, 11 ), TRUE );
+    // 제목 표시줄 채움
+    kInternalDrawRect( &stScreenArea, pstVideoMemory, iX, iY + 3, iX + iWidth - 1, iY + 21, RGB( 255, 255, 255 ), TRUE );
 
     // 윈도우 제목 표시
-    kInternalDrawText( &stScreenArea, pstVideoMemory, iX + 6, iY + 3, RGB( 255, 255, 255 ), RGB( 79, 204, 11 ), pcTitle, kStrLen( pcTitle ) );
+    kInternalDrawText( &stScreenArea, pstVideoMemory, iX + 6, iY + 3, RGB( 0, 0, 0 ), RGB( 255, 255, 255 ), pcTitle, kStrLen( pcTitle ) );
 
     // 제목 표시줄을 입체로 보이게
-    kInternalDrawLine( &stScreenArea, pstVideoMemory, iX + 1, iY + 1, iX + iWidth - 1, iY + 1, RGB( 183, 249, 171 ) );
-    kInternalDrawLine( &stScreenArea, pstVideoMemory, iX + 1, iY + 2, iX + iWidth - 1, iY + 2, RGB( 150, 210, 140 ) );
+    kInternalDrawLine( &stScreenArea, pstVideoMemory, iX + 1, iY + 1, iX + iWidth - 1, iY + 1, RGB( 255, 255, 255 ) );
+    kInternalDrawLine( &stScreenArea, pstVideoMemory, iX + 1, iY + 2, iX + iWidth - 1, iY + 2, RGB( 255, 255, 255 ) );
 
-    kInternalDrawLine( &stScreenArea, pstVideoMemory, iX + 1, iY + 2, iX + 1, iY + 20, RGB( 183, 249, 171 ) );
-    kInternalDrawLine( &stScreenArea, pstVideoMemory, iX + 2, iY + 2, iX + 2, iY + 20, RGB( 150, 210, 140 ) );
+    kInternalDrawLine( &stScreenArea, pstVideoMemory, iX + 1, iY + 2, iX + 1, iY + 20, RGB( 255, 255, 255 ) );
+    kInternalDrawLine( &stScreenArea, pstVideoMemory, iX + 2, iY + 2, iX + 2, iY + 20, RGB( 255, 255, 255 ) );
 
     // 제목 표시줄 아래 선
-    kInternalDrawLine( &stScreenArea, pstVideoMemory, iX + 2, iY + 19, iX + iWidth - 2, iY + 19, RGB( 46, 59, 30 ) );
-    kInternalDrawLine( &stScreenArea, pstVideoMemory, iX + 2, iY + 20, iX + iWidth - 2, iY + 20, RGB( 46, 59, 30 ) );
+    kInternalDrawLine( &stScreenArea, pstVideoMemory, iX + 2, iY + 19, iX + iWidth - 2, iY + 19, RGB( 255, 255, 255 ) );
+    kInternalDrawLine( &stScreenArea, pstVideoMemory, iX + 2, iY + 20, iX + iWidth - 2, iY + 20, RGB( 255, 255, 255 ) );
 
     // 닫기 버튼 그리기
-    kInternalDrawRect( &stScreenArea, pstVideoMemory, iX + iWidth - 2 - 18, iY + 1, iX + iWidth - 2, iY + 19, RGB( 255, 255, 255 ), TRUE );
+    kInternalDrawRect( &stScreenArea, pstVideoMemory, iX + iWidth - 2 - 18, iY + 1, iX + iWidth - 2, iY + 19, RGB( 0, 0, 0 ), TRUE );
 
     // 닫기 버튼을 입체로 보이게
-    kInternalDrawRect( &stScreenArea, pstVideoMemory, iX + iWidth - 2, iY + 1, iX + iWidth - 2, iY + 19 - 1, RGB( 86, 86, 86 ), TRUE );
-    kInternalDrawRect( &stScreenArea, pstVideoMemory, iX + iWidth - 2 - 1, iY + 1, iX + iWidth - 2 - 1, iY + 19 - 1, RGB( 86, 86, 86 ), TRUE );
-    kInternalDrawRect( &stScreenArea, pstVideoMemory, iX + iWidth - 2 - 18 + 1, iY + 19, iX + iWidth - 2, iY + 19, RGB( 86, 86, 86 ), TRUE );
-    kInternalDrawRect( &stScreenArea, pstVideoMemory, iX + iWidth - 2 - 18 + 1, iY + 19 - 1, iX + iWidth - 2, iY + 19 - 1, RGB( 86, 86, 86 ), TRUE );
+    kInternalDrawRect( &stScreenArea, pstVideoMemory, iX + iWidth - 2, iY + 1, iX + iWidth - 2, iY + 19 - 1, RGB( 255, 255, 255 ), TRUE );
+    kInternalDrawRect( &stScreenArea, pstVideoMemory, iX + iWidth - 2 - 1, iY + 1, iX + iWidth - 2 - 1, iY + 19 - 1, RGB( 255, 255, 255 ), TRUE );
+    kInternalDrawRect( &stScreenArea, pstVideoMemory, iX + iWidth - 2 - 18 + 1, iY + 19, iX + iWidth - 2, iY + 19, RGB( 255, 255, 255 ), TRUE );
+    kInternalDrawRect( &stScreenArea, pstVideoMemory, iX + iWidth - 2 - 18 + 1, iY + 19 - 1, iX + iWidth - 2, iY + 19 - 1, RGB( 255, 255, 255 ), TRUE );
 
-    kInternalDrawLine( &stScreenArea, pstVideoMemory, iX + iWidth - 2 - 18, iY + 1, iX + iWidth - 2 - 1, iY + 1, RGB( 229, 229, 229 ) );
-    kInternalDrawLine( &stScreenArea, pstVideoMemory, iX + iWidth - 2 - 18, iY + 1 + 1, iX + iWidth - 2 - 2, iY + 1 + 1, RGB( 229, 229, 229 ) );
-    kInternalDrawLine( &stScreenArea, pstVideoMemory, iX + iWidth - 2 - 18, iY + 1, iX + iWidth - 2 - 18, iY + 19, RGB( 229, 229, 229 ) );
-    kInternalDrawLine( &stScreenArea, pstVideoMemory, iX + iWidth - 2 - 18 + 1, iY + 1, iX + iWidth - 2 - 18 + 1, iY + 19 - 1, RGB( 229, 229, 229 ) );
+    kInternalDrawLine( &stScreenArea, pstVideoMemory, iX + iWidth - 2 - 18, iY + 1, iX + iWidth - 2 - 1, iY + 1, RGB( 255, 255, 255 ) );
+    kInternalDrawLine( &stScreenArea, pstVideoMemory, iX + iWidth - 2 - 18, iY + 1 + 1, iX + iWidth - 2 - 2, iY + 1 + 1, RGB( 255, 255, 255 ) );
+    kInternalDrawLine( &stScreenArea, pstVideoMemory, iX + iWidth - 2 - 18, iY + 1, iX + iWidth - 2 - 18, iY + 19, RGB( 255, 255, 255 ) );
+    kInternalDrawLine( &stScreenArea, pstVideoMemory, iX + iWidth - 2 - 18 + 1, iY + 1, iX + iWidth - 2 - 18 + 1, iY + 19 - 1, RGB( 255, 255, 255 ) );
 
     // 대각선 x를 그림
-    kInternalDrawLine( &stScreenArea, pstVideoMemory, iX + iWidth - 2 - 18 + 4, iY + 1 + 4, iX + iWidth - 2 - 4, iY + 19 - 4, RGB( 71, 199, 21 ) );
-    kInternalDrawLine( &stScreenArea, pstVideoMemory, iX + iWidth - 2 - 18 + 5, iY + 1 + 4, iX + iWidth - 2 - 4, iY + 19 - 5, RGB( 71, 199, 21 ) );
-    kInternalDrawLine( &stScreenArea, pstVideoMemory, iX + iWidth - 2 - 18 + 4, iY + 1 + 5, iX + iWidth - 2 - 5, iY + 19 - 4, RGB( 71, 199, 21 ) );
-    kInternalDrawLine( &stScreenArea, pstVideoMemory, iX + iWidth - 2 - 18 + 4, iY + 19 - 4, iX + iWidth - 2 - 4, iY + 1 + 4, RGB( 71, 199, 21 ) );
-    kInternalDrawLine( &stScreenArea, pstVideoMemory, iX + iWidth - 2 - 18 + 5, iY + 19 - 4, iX + iWidth - 2 - 4, iY + 1 + 5, RGB( 71, 199, 21 ) );
-    kInternalDrawLine( &stScreenArea, pstVideoMemory, iX + iWidth - 2 - 18 + 4, iY + 19 - 5, iX + iWidth - 2 - 5, iY + 1 + 4, RGB( 71, 199, 21 ) );
+    kInternalDrawLine( &stScreenArea, pstVideoMemory, iX + iWidth - 2 - 18 + 4, iY + 1 + 4, iX + iWidth - 2 - 4, iY + 19 - 4, RGB( 255, 255, 255 ) );
+    kInternalDrawLine( &stScreenArea, pstVideoMemory, iX + iWidth - 2 - 18 + 5, iY + 1 + 4, iX + iWidth - 2 - 4, iY + 19 - 5, RGB( 255, 255, 255 ) );
+    kInternalDrawLine( &stScreenArea, pstVideoMemory, iX + iWidth - 2 - 18 + 4, iY + 1 + 5, iX + iWidth - 2 - 5, iY + 19 - 4, RGB( 255, 255, 255 ) );
+    kInternalDrawLine( &stScreenArea, pstVideoMemory, iX + iWidth - 2 - 18 + 4, iY + 19 - 4, iX + iWidth - 2 - 4, iY + 1 + 4, RGB( 255, 255, 255 ) );
+    kInternalDrawLine( &stScreenArea, pstVideoMemory, iX + iWidth - 2 - 18 + 5, iY + 19 - 4, iX + iWidth - 2 - 4, iY + 1 + 5, RGB( 255, 255, 255 ) );
+    kInternalDrawLine( &stScreenArea, pstVideoMemory, iX + iWidth - 2 - 18 + 4, iY + 19 - 5, iX + iWidth - 2 - 5, iY + 1 + 4, RGB( 255, 255, 255 ) );
 
     // 내부를 그림
-    kInternalDrawRect( &stScreenArea, pstVideoMemory, iX + 2, iY + 21, iX + iWidth - 2, iY + iHeight - 2, RGB( 255, 255, 255 ), TRUE );
+    kInternalDrawRect( &stScreenArea, pstVideoMemory, iX + 2, iY + 21, iX + iWidth - 2, iY + iHeight - 2, RGB( 0, 0, 0 ), TRUE );
 
     // 테스트 문자 출력
-    kInternalDrawText( &stScreenArea, pstVideoMemory, iX + 10, iY + 30, RGB( 0, 0, 0 ), RGB( 255, 255, 255 ), pcTestString1, kStrLen( pcTestString1 ) );
-    kInternalDrawText( &stScreenArea, pstVideoMemory, iX + 10, iY + 50, RGB( 0, 0, 0 ), RGB( 255, 255, 255 ), pcTestString2, kStrLen( pcTestString2 ) );
+    kInternalDrawText( &stScreenArea, pstVideoMemory, iX + 10, iY + 30, RGB( 255, 255, 255 ), RGB( 0, 0, 0 ), pcTestString1, kStrLen( pcTestString1 ) );
+    kInternalDrawText( &stScreenArea, pstVideoMemory, iX + 10, iY + 50, RGB( 255, 255, 255 ), RGB( 0, 0, 0 ), pcTestString2, kStrLen( pcTestString2 ) );
+
+}
+
+#define MOUSE_CURSOR_WIDTH  10
+#define MOUSE_CURSOR_HEIGHT 20
+
+static BYTE gs_vwMouseBuffer[ MOUSE_CURSOR_WIDTH * MOUSE_CURSOR_HEIGHT ] = {
+
+    1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    1, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+    1, 2, 1, 0, 0, 0, 0, 0, 0, 0,
+    1, 2, 2, 1, 0, 0, 0, 0, 0, 0,
+    1, 2, 3, 2, 1, 0, 0, 0, 0, 0,
+    1, 2, 3, 3, 2, 1, 0, 0, 0, 0,
+    1, 2, 3, 3, 3, 2, 1, 0, 0, 0,
+    1, 2, 3, 3, 3, 3, 2, 1, 0, 0,
+    1, 2, 3, 3, 3, 2, 3, 2, 1, 0,
+    1, 2, 3, 3, 3, 2, 3, 3, 2, 1,
+    1, 2, 3, 3, 3, 3, 2, 2, 2, 1,
+    1, 2, 2, 2, 2, 2, 2, 1, 1, 1,
+    1, 2, 1, 1, 2, 2, 1, 0, 0, 0,
+    1, 1, 0, 0, 1, 2, 1, 0, 0, 0,
+    1, 0, 0, 0, 1, 2, 2, 1, 0, 0,
+    0, 0, 0, 0, 0, 1, 2, 1, 0, 0,
+    0, 0, 0, 0, 0, 1, 2, 2, 1, 0,
+    0, 0, 0, 0, 0, 0, 1, 2, 1, 0,
+    0, 0, 0, 0, 0, 0, 0, 1, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+
+};
+
+#define MOUSE_CURSOR_OUTERLINE  RGB( 255, 255, 255 )
+#define MOUSE_CURSOR_OUTER      RGB( 255, 255, 255 )
+#define MOUSE_CURSOR_INNER      RGB( 0, 0, 0 )
+
+void kDrawCursor( RECT* pstArea, COLOR* pstVideoMemory, int iX, int iY ) {
+
+    int i;
+    int j;
+    BYTE* pbCurrentPos;
+
+    pbCurrentPos = gs_vwMouseBuffer;
+
+    for( j = 0; j < MOUSE_CURSOR_HEIGHT; j++ ) {
+
+        for( i = 0; i < MOUSE_CURSOR_WIDTH; i++ ) {
+
+            switch( *pbCurrentPos ) {
+
+            case 0:
+                // nothing
+                break;
+
+            case 1:
+                kInternalDrawPixel( pstArea, pstVideoMemory, i + iX, j + iY, MOUSE_CURSOR_OUTERLINE );
+                break;
+
+            case 2:
+                kInternalDrawPixel( pstArea, pstVideoMemory, i + iX, j + iY, MOUSE_CURSOR_OUTER );
+
+            case 3:
+                kInternalDrawPixel( pstArea, pstVideoMemory, i + iX, j + iY, MOUSE_CURSOR_INNER );
+                break;
+
+            }
+
+            pbCurrentPos++;
+
+        }
+
+    }
 
 }
 
 void kStartGraphicModeTest() {
 
     VBEMODEINFOBLOCK* pstVBEMode;
-    int iX1, iY1, iX2, iY2;
-    COLOR stColor1, stColor2;
-    int i;
-    char* vpcString[] = { "Pixel", "Line", "Rectangle", "Circle", "MINT64 OS", "c0wb3ll" };
+    int iX, iY;
     COLOR* pstVideoMemory;
     RECT stScreenArea;
+    int iRelativeX, iRelativeY;
+    BYTE bButton;
 
     pstVBEMode = kGetVBEModeInfoBlock();
 
@@ -269,109 +391,58 @@ void kStartGraphicModeTest() {
 
     pstVideoMemory = ( COLOR* ) ( ( QWORD )pstVBEMode->dwPhysicalBasePointer & 0xFFFFFFFF );
 
-    // (0, 0)에 Pixel이란 문자열을 검은색 바탕에 흰색으로 출력
-    kInternalDrawText( &stScreenArea, pstVideoMemory, 0, 0, RGB( 255, 255, 255), RGB( 0, 0, 0 ), vpcString[ 0 ], kStrLen( vpcString[ 0 ] ) );
-    // 픽셀을 (1, 20), (2, 20)에 흰색으로 출력
-    kInternalDrawPixel( &stScreenArea, pstVideoMemory, 1, 20, RGB( 255, 255, 255 ) );
-    kInternalDrawPixel( &stScreenArea, pstVideoMemory, 2, 20, RGB( 255, 255, 255 ) );
+    iX = pstVBEMode->wXResolution / 2;
+    iY = pstVBEMode->wYResolution / 2;
 
-    // (0, 25)에 Line이란 문자열을 검은색 바탕에 빨간색으로 출력
-    kInternalDrawText( &stScreenArea, pstVideoMemory, 0, 25, RGB( 255, 0, 0), RGB( 0, 0, 0 ), vpcString[ 1 ], kStrLen( vpcString[ 1 ] ) );
-    // (20, 50)을 중심으로 (1000, 50) (1000, 100), (1000, 150), (1000, 200), 
-    // (1000, 250)까지 빨간색으로 출력
-    kInternalDrawLine( &stScreenArea, pstVideoMemory, 20, 50, 1000, 50, RGB( 255, 0, 0 ) );
-    kInternalDrawLine( &stScreenArea, pstVideoMemory, 20, 50, 1000, 100, RGB( 255, 0, 0 ) );
-    kInternalDrawLine( &stScreenArea, pstVideoMemory, 20, 50, 1000, 150, RGB( 255, 0, 0 ) );
-    kInternalDrawLine( &stScreenArea, pstVideoMemory, 20, 50, 1000, 200, RGB( 255, 0, 0 ) );
-    kInternalDrawLine( &stScreenArea, pstVideoMemory, 20, 50, 1000, 250, RGB( 255, 0, 0 ) );
+    kInternalDrawRect( &stScreenArea, pstVideoMemory, stScreenArea.iX1, stScreenArea.iY1, stScreenArea.iX2, stScreenArea.iY2, RGB( 60, 80, 100 ), TRUE );
 
-    // (0, 180)에 Rectangle이란 문자열을 검은색 바탕에 녹색으로 출력
-    kInternalDrawText( &stScreenArea, pstVideoMemory, 0, 180, RGB( 0, 255, 0), RGB( 0, 0, 0 ), vpcString[ 2 ], kStrLen( vpcString[ 2 ] ) );
-    // (20, 200)에서 시작하여 길이가 각각 50, 100, 150, 200인 사각형을 녹색으로 출력
-    kInternalDrawRect( &stScreenArea, pstVideoMemory, 20, 200, 70, 250, RGB( 0, 255, 0 ), FALSE );
-    kInternalDrawRect( &stScreenArea, pstVideoMemory, 120, 200, 220, 300, RGB( 0, 255, 0 ), TRUE );
-    kInternalDrawRect( &stScreenArea, pstVideoMemory, 270, 200, 420, 350, RGB( 0, 255, 0 ), FALSE );
-    kInternalDrawRect( &stScreenArea, pstVideoMemory, 470, 200, 670, 400, RGB( 0, 255, 0 ), TRUE );
-
-    // (0, 550)에 Circle이란 문자열을 검은색 바탕에 파란색으로 출력
-    kInternalDrawText( &stScreenArea, pstVideoMemory, 0, 550, RGB( 0, 0, 255), RGB( 0, 0, 0 ), vpcString[ 3 ], kStrLen( vpcString[ 3 ] ) );
-    // (45, 600)에서 시작하여 반지름이 25, 50, 75, 100인 원을 파란색으로 출력
-    kInternalDrawCircle( &stScreenArea, pstVideoMemory, 45, 600, 25, RGB( 0, 0, 255 ), FALSE ) ;
-    kInternalDrawCircle( &stScreenArea, pstVideoMemory, 170, 600, 50, RGB( 0, 0, 255 ), TRUE ) ;
-    kInternalDrawCircle( &stScreenArea, pstVideoMemory, 345, 600, 75, RGB( 0, 0, 255 ), FALSE ) ;
-    kInternalDrawCircle( &stScreenArea, pstVideoMemory, 570, 600, 100, RGB( 0, 0, 255 ), TRUE ) ;
-
-    kGetCh();
-
-    do {
-
-        // 점 그리기
-        for( i = 0; i < 100; i++ ) {
-
-            kGetRandomXY( &iX1, &iY1 );
-            stColor1 = kGetRandomColor();
-
-            kInternalDrawPixel( &stScreenArea, pstVideoMemory, iX1, iY1, stColor1 );
-
-        }
-
-        // 선 그리기
-        for( i = 0; i < 100; i++ ) {
-
-            kGetRandomXY( &iX1, &iY1 );
-            kGetRandomXY( &iX2, &iY2 );
-            stColor1 = kGetRandomColor();
-
-            kInternalDrawLine( &stScreenArea, pstVideoMemory, iX1, iY1, iX2, iY2, stColor1 );
-
-        }
-
-        // 사각형 그리기
-        for( i = 0; i < 20; i++ ) {
-
-            kGetRandomXY( &iX1, &iY1 );
-            kGetRandomXY( &iX2, &iY2 );
-            stColor1 = kGetRandomColor();
-
-            kInternalDrawRect( &stScreenArea, pstVideoMemory, iX1, iY1, iX2, iY2, stColor1, kRandom() % 2 );
-
-        }
-
-        // 원 그리기
-        for( i = 0; i < 100; i++ ) {
-
-            kGetRandomXY( &iX1, &iY1 );
-            stColor1 = kGetRandomColor();
-
-            kInternalDrawCircle( &stScreenArea, pstVideoMemory, iX1, iY1, ABS( kRandom() % 50 + 1 ), stColor1, kRandom() % 2 );
-
-        }
-
-        for( i = 0; i < 100; i++ ) {
-
-            kGetRandomXY( &iX1, &iY1 );
-            stColor1 = kGetRandomColor();
-            stColor2 = kGetRandomColor();
-
-            kInternalDrawText( &stScreenArea, pstVideoMemory, iX1, iY1, stColor1, stColor2, vpcString[ 5 ], kStrLen( vpcString[ 5 ] ) );
-
-        }
-
-    } while( kGetCh() != 'q' );
+    kDrawCursor( &stScreenArea, pstVideoMemory, iX, iY );
 
     while( 1 ) {
 
-        // 배경 출력
-        kInternalDrawRect( &stScreenArea, pstVideoMemory, 0, 0, 1024, 768, RGB( 232, 255, 232 ), TRUE );
+        if( kGetMouseDataFromMouseQueue( &bButton, &iRelativeX, &iRelativeY ) == FALSE ) {
 
-        for( i = 0; i < 3; i++ ) {
-
-            kGetRandomXY( &iX1, &iY1 );
-            kDrawWindowFrame( iX1, iY1, 400, 200, "Mint64 OS Test Window" );
+            kSleep( 0 );
+            continue;
 
         }
 
-        kGetCh();
+        kInternalDrawRect( &stScreenArea, pstVideoMemory, iX, iY, iX + MOUSE_CURSOR_WIDTH, iY + MOUSE_CURSOR_HEIGHT, RGB( 60, 80, 100 ), TRUE );
+
+        iX += iRelativeX;
+        iY += iRelativeY;
+
+        if( iX < stScreenArea.iX1 ) {
+
+            iX = stScreenArea.iX1;
+
+        } else if( iX > stScreenArea.iX2 ) {
+
+            iX = stScreenArea.iX2;
+
+        }
+
+        if( iY < stScreenArea.iY1 ) {
+
+            iY = stScreenArea.iY1;
+
+        } else if( iY > stScreenArea.iY2 ) {
+
+            iY = stScreenArea.iY2;
+
+        }
+
+        if( bButton & MOUSE_LBUTTONDOWN ) {
+
+            kDrawWindowFrame( iX - 10, iY - 10, 400, 200, "Mint64 OS Test Window with c0wb3ll");
+
+        } else if( bButton & MOUSE_RBUTTONDOWN ) {
+
+            kInternalDrawRect( &stScreenArea, pstVideoMemory, stScreenArea.iX1, stScreenArea.iY1, stScreenArea.iX2, stScreenArea.iY2, RGB( 60, 80, 100 ), TRUE );
+
+        }
+
+        kDrawCursor( &stScreenArea, pstVideoMemory, iX, iY );
 
     }
 

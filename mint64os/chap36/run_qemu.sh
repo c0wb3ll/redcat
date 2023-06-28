@@ -1,7 +1,7 @@
 O_DEBUG=""
 O_ARCH="x86_64"
 O_DISK="-hda ${PWD}/HDD.img"
-O_SINGLE_CORE="-smp sockets=4"
+O_SINGLE_CORE="-smp sockets=16"
 
 while getopts da: opts; do
     case $opts in
