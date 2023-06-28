@@ -4,7 +4,7 @@
 #include "Utility.h"
 
 // 점 그리기
-void kDrawPixel( int iX, int iY, COLOR stColor ) {
+extern inline void kDrawPixel( int iX, int iY, COLOR stColor ) {
 
     VBEMODEINFOBLOCK* pstModeInfo;
 

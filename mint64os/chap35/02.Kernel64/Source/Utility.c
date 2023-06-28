@@ -32,7 +32,7 @@ void kMemSet( void* pvDestination, BYTE bData, int iSize ) {
 
 }
 
-void kMemSetWord( void* pvDestination, WORD wData, int iWordSize ) {
+extern inline void kMemSetWord( void* pvDestination, WORD wData, int iWordSize ) {
 
     int i;
     QWORD qwData;
