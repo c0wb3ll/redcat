@@ -108,6 +108,7 @@ void kInitializeGUISystem( void ) {
 
     VBEMODEINFOBLOCK* pstModeInfo;
     QWORD qwBackgroundWindowID;
+    EVENT* pstEventBuffer;
 
     kInitializeWindowPool();
 
@@ -126,6 +127,24 @@ void kInitializeGUISystem( void ) {
     kInitializeMutex( &( gs_stWindowManager.stLock ) );
 
     kInitializeList( &( gs_stWindowManager.stWindowList ) );
+
+    pstEventBuffer = ( EVENT* ) kAllocateMemory( sizeof( EVENT ) * EVENTQUEUE_WINDOWMANAGERMAXCOUNT );
+    if( pstEventBuffer == NULL ) {
+
+        kPrintf( "Window Manager Event Queue Allocate Fail\n" );
+        while( 1 ) {
+
+            ;
+
+        }
+
+    }
+
+    kInitializeQueue( &( gs_stWindowManager.stEventQueue ), pstEventBuffer, EVENTQUEUE_WINDOWMANAGERMAXCOUNT, sizeof( EVENT ) );
+
+    gs_stWindowManager.bPreviousButtonStatus = 0;
+    gs_stWindowManager.bWindowMoveMode = FALSE;
+    gs_stWindowManager.qwMovingWindowID = WINDOW_INVALIDID;
 
     qwBackgroundWindowID = kCreateWindow( 0, 0, pstModeInfo->wXResolution, pstModeInfo->wYResolution, 0, WINDOW_BACKGROUNDWINDOWTITLE );
     gs_stWindowManager.qwBackgroundWindowID = qwBackgroundWindowID;
@@ -159,6 +178,8 @@ QWORD kCreateWindow( int iX, int iY, int iWidth, int iHeight, DWORD dwFlags, con
 
     WINDOW* pstWindow;
     TCB* pstTask;
+    QWORD qwActiveWindowID;
+    EVENT stEvent;
 
     if( ( iWidth <= 0 ) || ( iHeight <= 0 ) ) {
 
@@ -182,13 +203,18 @@ QWORD kCreateWindow( int iX, int iY, int iWidth, int iHeight, DWORD dwFlags, con
     pstWindow->vcWindowTitle[ WINDOW_TITLEMAXLENGTH ] = '\0';
 
     pstWindow->pstWindowBuffer = ( COLOR* ) kAllocateMemory( iWidth * iHeight * sizeof( COLOR ) );
-    if( pstWindow == NULL ) {
+    pstWindow->pstEventBuffer = ( EVENT* ) kAllocateMemory( EVENTQUEUE_WINDOWMAXCOUNT * sizeof( EVENT ) );
+    if( ( pstWindow->pstWindowBuffer == NULL ) || ( pstWindow->pstEventBuffer == NULL ) ) {
+
+        kFreeMemory( pstWindow->pstWindowBuffer );
+        kFreeMemory( pstWindow->pstEventBuffer );
 
         kFreeWindow( pstWindow->stLink.qwID );
         return WINDOW_INVALIDID;
 
     }
 
+    kInitializeQueue( &( pstWindow->stEventQueue ), pstWindow->pstEventBuffer, EVENTQUEUE_WINDOWMAXCOUNT, sizeof( EVENT ) );
     pstTask = kGetRunningTask( kGetAPICID() );
     pstWindow->qwTaskID = pstTask->stLink.qwID;
 
@@ -204,19 +230,27 @@ QWORD kCreateWindow( int iX, int iY, int iWidth, int iHeight, DWORD dwFlags, con
 
     if( dwFlags & WINDOW_FLAGS_DRAWTITLE ) {
 
-        kDrawWindowTitle( pstWindow->stLink.qwID, pcTitle );
+        kDrawWindowTitle( pstWindow->stLink.qwID, pcTitle, TRUE );
 
     }
 
     kLock( &( gs_stWindowManager.stLock ) );
 
+    qwActiveWindowID = kGetTopWindowID();
+
     kAddListToTail( &gs_stWindowManager.stWindowList, pstWindow );
 
     kUnlock( &( gs_stWindowManager.stLock ) );
 
-    if( dwFlags & WINDOW_FLAGS_SHOW ) {
+    kUpdateScreenByID( pstWindow->stLink.qwID );
+    kSetWindowEvent( pstWindow->stLink.qwID, EVENT_WINDOW_SELECT, &stEvent );
+    kSendEventToWindow( pstWindow->stLink.qwID, &stEvent );
 
-        kRedrawWindowByArea( &( pstWindow->stArea ) );
+    if( qwActiveWindowID != gs_stWindowManager.qwBackgroundWindowID ) {
+
+        kUpdateWindowTitle( qwActiveWindowID, FALSE );
+        kSetWindowEvent( qwActiveWindowID, EVENT_WINDOW_DESELECT, &stEvent );
+        kSendEventToWindow( qwActiveWindowID, &stEvent );
 
     }
 
@@ -229,6 +263,9 @@ BOOL kDeleteWindow( QWORD qwWindowID ) {
 
     WINDOW* pstWindow;
     RECT stArea;
+    QWORD qwActiveWindowID;
+    BOOL bActiveWindow;
+    EVENT stEvent;
 
     kLock( &( gs_stWindowManager.stLock ) );
 
@@ -242,6 +279,18 @@ BOOL kDeleteWindow( QWORD qwWindowID ) {
 
     kMemCpy( &stArea, &( pstWindow->stArea ), sizeof( RECT ) );
 
+    qwActiveWindowID = kGetTopWindowID();
+
+    if( qwActiveWindowID == qwWindowID ) {
+
+        bActiveWindow = TRUE;
+
+    } else {
+
+        bActiveWindow = FALSE;
+
+    }
+
     if( kRemoveList( &( gs_stWindowManager.stWindowList ), qwWindowID ) == NULL ) {
 
         kUnlock( &( pstWindow->stLock ) );
@@ -250,9 +299,11 @@ BOOL kDeleteWindow( QWORD qwWindowID ) {
 
     }
 
-    kLock( &( pstWindow->stLock ) );
-
     kFreeMemory( pstWindow->pstWindowBuffer );
+    pstWindow->pstWindowBuffer = NULL;
+
+    kFreeMemory( pstWindow->pstEventBuffer );
+    pstWindow->pstEventBuffer = NULL;
 
     kUnlock( &( pstWindow->stLock ) );
 
@@ -260,7 +311,22 @@ BOOL kDeleteWindow( QWORD qwWindowID ) {
 
     kUnlock( &( gs_stWindowManager.stLock ) );
 
-    kRedrawWindowByArea( &stArea );
+    kUpdateScreenByScreenArea( &stArea );
+
+    if( bActiveWindow == TRUE ) {
+
+        qwActiveWindowID = kGetTopWindowID();
+
+        if( qwActiveWindowID != WINDOW_INVALIDID ) {
+
+            kUpdateWindowTitle( qwActiveWindowID, TRUE );
+            
+            kSetWindowEvent( qwActiveWindowID, EVENT_WINDOW_SELECT, &stEvent );
+            kSendEventToWindow( qwActiveWindowID, &stEvent );
+
+        }
+
+    }
 
     return TRUE;
 
@@ -345,6 +411,7 @@ WINDOW* kGetWindowWithWindowLock( QWORD qwWindowID ) {
 BOOL kShowWindow( QWORD qwWindowID, BOOL bShow ) {
 
     WINDOW* pstWindow;
+    RECT stWindowArea;
 
     pstWindow = kGetWindowWithWindowLock( qwWindowID );
     if( pstWindow == NULL ) {
@@ -365,7 +432,16 @@ BOOL kShowWindow( QWORD qwWindowID, BOOL bShow ) {
 
     kUnlock( &( pstWindow->stLock ) );
 
-    kRedrawWindowByArea( &( pstWindow->stArea ) );
+    if( bShow == TRUE ) {
+
+        kUpdateScreenByID( qwWindowID );
+
+    } else {
+
+        kGetWindowArea( qwWindowID, &stWindowArea );
+        kUpdateScreenByScreenArea( &stWindowArea );
+
+    }
 
     return TRUE;
 
@@ -461,6 +537,597 @@ static void kCopyWindowBufferToFrameBuffer( const WINDOW* pstWindow, const RECT*
 
 }
 
+// 특정 위치를 포함하는 윈도우 중에서 가장 위에 있는 윈도우 반환
+QWORD kFindWindowByPoint( int iX, int iY ) {
+
+    QWORD qwWindowID;
+    WINDOW* pstWindow;
+
+    qwWindowID = gs_stWindowManager.qwBackgroundWindowID;
+
+    kLock( &( gs_stWindowManager.stLock ) );
+
+    pstWindow = kGetHeaderFromList( &( gs_stWindowManager.stWindowList ) );
+
+    do {
+
+        pstWindow = kGetNextFromList( &( gs_stWindowManager.stWindowList ), pstWindow );
+
+        if( ( pstWindow != NULL ) && (pstWindow->dwFlags & WINDOW_FLAGS_SHOW ) && ( kIsInRectangle( &( pstWindow->stArea ), iX, iY ) == TRUE ) ) {
+
+            qwWindowID = pstWindow->stLink.qwID;
+
+        }
+
+    } while( pstWindow != NULL );
+
+    kUnlock( &( gs_stWindowManager.stLock ) );
+
+    return qwWindowID;
+
+}
+
+// 윈도우 제목이 일치하는 윈도우를 반환
+QWORD kFindWindowByTitle( const char* pcTitle ) {
+
+    QWORD qwWindowID;
+    WINDOW* pstWindow;
+    int iTitleLength;
+
+    qwWindowID = WINDOW_INVALIDID;
+    iTitleLength = kStrLen( pcTitle );
+
+    kLock( &( gs_stWindowManager.stLock ) );
+
+    pstWindow = kGetHeaderFromList( &( gs_stWindowManager.stWindowList ) );
+    while( pstWindow != NULL ) {
+
+        if( ( kStrLen( pstWindow->vcWindowTitle ) == iTitleLength ) && ( kMemCmp( pstWindow->vcWindowTitle, pcTitle, iTitleLength ) == 0 ) ) {
+
+            qwWindowID = pstWindow->stLink.qwID;
+            break;
+
+        }
+
+        pstWindow = kGetNextFromList( &( gs_stWindowManager.stWindowList ), pstWindow );
+
+    }
+
+    kUnlock( &( gs_stWindowManager.stLock ) );
+
+    return qwWindowID;
+
+}
+
+// 윈도우가 존재하는지 여부 반환
+BOOL kIsWindowExist( QWORD qwWindowID ) {
+
+    if( kGetWindow( qwWindowID ) == NULL ) {
+
+        return FALSE;
+
+    }
+
+    return TRUE;
+
+}
+
+// 최상위 윈도우 ID 반환
+QWORD kGetTopWindowID( void ) {
+
+    WINDOW* pstActiveWindow;
+    QWORD qwActiveWindowID;
+
+    kLock( &( gs_stWindowManager.stLock ) );
+
+    pstActiveWindow = ( WINDOW* ) kGetTailFromList( &( gs_stWindowManager.stWindowList ) );
+    if( pstActiveWindow != NULL ) {
+
+        qwActiveWindowID = pstActiveWindow->stLink.qwID;
+
+    } else {
+
+        qwActiveWindowID = WINDOW_INVALIDID;
+
+    }
+
+    kUnlock( &( gs_stWindowManager.stLock ) );
+
+    return qwActiveWindowID;
+
+}
+
+// 윈도우의 z순서를 최상위로 만듬
+BOOL kMoveWindowToTop( QWORD qwWindowID ) {
+
+    WINDOW* pstWindow;
+    RECT stArea;
+    DWORD dwFlags;
+    QWORD qwTopWindowID;
+    EVENT stEvent;
+
+    qwTopWindowID = kGetTopWindowID();
+    if( qwTopWindowID == qwWindowID ) {
+
+        return TRUE;
+
+    }
+
+    kLock( &( gs_stWindowManager.stLock ) );
+
+    pstWindow = kRemoveList( &( gs_stWindowManager.stWindowList ), qwWindowID );
+    if( pstWindow != NULL ) {
+
+        kAddListToTail( &( gs_stWindowManager.stWindowList ), pstWindow );
+
+        kConvertRectScreenToClient( qwWindowID, &( pstWindow->stArea ), &stArea );
+        dwFlags = pstWindow->dwFlags;
+
+    }
+
+    kUnlock( &( gs_stWindowManager.stLock ) );
+
+    if( pstWindow != NULL ) {
+
+        kSetWindowEvent( qwWindowID, EVENT_WINDOW_SELECT, &stEvent );
+        kSendEventToWindow( qwWindowID, &stEvent );
+        if( dwFlags & WINDOW_FLAGS_DRAWTITLE ) {
+
+            kUpdateWindowTitle( qwWindowID, TRUE );
+
+            stArea.iY1 += WINDOW_TITLEBAR_HEIGHT;
+            kUpdateScreenByWindowArea( qwWindowID, &stArea );
+
+        } else {
+
+            kUpdateScreenByID( qwWindowID );
+
+        }
+
+        kSetWindowEvent( qwTopWindowID, EVENT_WINDOW_DESELECT, &stEvent );
+        kSendEventToWindow( qwTopWindowID, &stEvent );
+        kUpdateWindowTitle( qwTopWindowID, FALSE );
+
+        return TRUE;
+
+    }
+    
+
+    return FALSE;
+
+}
+
+BOOL kIsInTitleBar( QWORD qwWindowID, int iX, int iY ) {
+
+    WINDOW* pstWindow;
+
+    pstWindow = kGetWindow( qwWindowID );
+
+    if( ( pstWindow == NULL ) || ( ( pstWindow->dwFlags & WINDOW_FLAGS_DRAWTITLE ) == 0 ) ) {
+
+        return FALSE;
+
+    }
+
+    if( ( pstWindow->stArea.iX1 <= iX ) && ( iX <= pstWindow->stArea.iX2 ) && ( pstWindow->stArea.iY1 <= iY ) && ( iY <= pstWindow->stArea.iY1 + WINDOW_TITLEBAR_HEIGHT ) ) {
+
+        return TRUE;
+
+    }
+
+    return FALSE;
+
+}
+
+// X, Y 좌표가 윈도우의 닫기 버튼 위치에 있는지를 반환
+BOOL kIsInCloseButton( QWORD qwWindowID, int iX, int iY ) {
+
+    WINDOW* pstWindow;
+
+    pstWindow = kGetWindow( qwWindowID );
+
+    if( ( pstWindow == NULL ) && ( ( pstWindow->dwFlags & WINDOW_FLAGS_DRAWTITLE ) == 0 ) ) {
+
+        return FALSE;
+
+    }
+
+    if( ( ( pstWindow->stArea.iX2 - WINDOW_XBUTTON_SIZE - 1 ) <= iX ) && ( iX <= ( pstWindow->stArea.iX2 - 1 ) ) && ( ( pstWindow->stArea.iY1 + 1 ) <= iY ) && ( iY <= ( pstWindow->stArea.iY1 + 1 + WINDOW_XBUTTON_SIZE ) ) ) {
+
+        return TRUE;
+
+    }
+
+    return FALSE;
+
+}
+
+// 윈도우를 해당 위치로 이동
+BOOL kMoveWindow( QWORD qwWindowID, int iX, int iY ) {
+
+    WINDOW* pstWindow;
+    RECT stPreviousArea;
+    int iWidth;
+    int iHeight;
+    EVENT stEvent;
+
+    pstWindow = kGetWindowWithWindowLock( qwWindowID );
+    if( pstWindow == NULL ) {
+
+        return FALSE;
+
+    }
+
+    kMemCpy( &stPreviousArea, &( pstWindow->stArea ), sizeof( RECT ) );
+
+    iWidth = kGetRectangleWidth( &stPreviousArea );
+    iHeight = kGetRectangleHeight( & stPreviousArea );
+    kSetRectangleData( iX, iY, iX + iWidth - 1, iY + iHeight - 1, &( pstWindow->stArea ) );
+
+    kUnlock( &( pstWindow->stLock ) );
+
+    kUpdateScreenByScreenArea( &stPreviousArea );
+
+    kUpdateScreenByID( qwWindowID );
+
+    kSetWindowEvent( qwWindowID, EVENT_WINDOW_MOVE, &stEvent );
+    kSendEventToWindow( qwWindowID, &stEvent );
+
+    return TRUE;
+
+}
+
+// 윈도우 제목 표시줄을 새로 그림
+static BOOL kUpdateWindowTitle( QWORD qwWindowID, BOOL bSelectedTitle ) {
+
+    WINDOW* pstWindow;
+    RECT stTitleBarArea;
+
+    pstWindow = kGetWindow( qwWindowID );
+
+    if( ( pstWindow != NULL ) && ( pstWindow->dwFlags & WINDOW_FLAGS_DRAWTITLE ) ) {
+
+        kDrawWindowTitle( pstWindow->stLink.qwID, pstWindow->vcWindowTitle, bSelectedTitle );
+
+        stTitleBarArea.iX1 = 0;
+        stTitleBarArea.iY1 = 0;
+        stTitleBarArea.iX2 = kGetRectangleWidth( &( pstWindow->stArea ) ) - 1;
+        stTitleBarArea.iY2 = WINDOW_TITLEBAR_HEIGHT;
+
+        kUpdateScreenByWindowArea( qwWindowID, &stTitleBarArea );
+
+        return TRUE;
+
+    }
+
+    return FALSE;
+
+}
+
+// 윈도우 영역을 반환
+BOOL kGetWindowArea( QWORD qwWindowID, RECT* pstArea ) {
+
+    WINDOW* pstWindow;
+
+    pstWindow = kGetWindowWithWindowLock( qwWindowID );
+    if( pstWindow == NULL ) {
+
+        return FALSE;
+
+    }
+
+    kMemCpy( pstArea, &( pstWindow->stArea ), sizeof( RECT ) );
+
+    kUnlock( &( pstWindow->stLock ) );
+
+    return TRUE;
+
+}
+
+// 전체 화면을 기준으로 한 X, Y 좌표를 윈도우 내부 좌표로 변환
+BOOL kConvertPointScreenToClient( QWORD qwWindowID, const POINT* pstXY, POINT* pstXYInWindow ) {
+
+    RECT stArea;
+
+    if( kGetWindowArea( qwWindowID, &stArea ) == FALSE ) {
+
+        return FALSE;
+
+    }
+
+    pstXYInWindow->iX = pstXY->iX - stArea.iX1;
+    pstXYInWindow->iY = pstXY->iY - stArea.iY1;
+
+    return TRUE;
+
+}
+
+// 윈도우 내부를 기준으로 한 X, Y 좌표를 화면 좌표로 반환
+BOOL kConvertPointClientToScreen( QWORD qwWindowID, const POINT* pstXY, POINT* pstXYInScreen ) {
+
+    RECT stArea;
+    if( kGetWindowArea( qwWindowID, &stArea ) == FALSE ) {
+
+        return FALSE;
+
+    }
+
+    pstXYInScreen->iX = pstXY->iX + stArea.iX1;
+    pstXYInScreen->iY = pstXY->iY + stArea.iY1;
+
+    return TRUE;
+
+}
+
+// 전체 화면을 기준으로 한 사각형 좌표를 윈도우 내부 좌표로 변환
+BOOL kConvertRectScreenToClient( QWORD qwWindowID, const RECT* pstArea, RECT* pstAreaInWindow ) {
+
+    RECT stWindowArea;
+
+    if( kGetWindowArea( qwWindowID, &stWindowArea ) == FALSE ) {
+
+        return FALSE;
+
+    }
+    
+    pstAreaInWindow->iX1 = pstArea->iX1 - stWindowArea.iX1;
+    pstAreaInWindow->iY1 = pstArea->iY1 - stWindowArea.iY1;
+    pstAreaInWindow->iX2 = pstArea->iX2 - stWindowArea.iX1;
+    pstAreaInWindow->iY2 = pstArea->iY2 - stWindowArea.iY1;
+    
+    return TRUE;
+
+}
+
+// 윈도우 내부를 기준으로 한 사각형 좌표를 화면 좌표로 변환
+BOOL kConvertRectClientToScreen( QWORD qwWindowID, const RECT* pstArea, RECT* pstAreaInScreen ) {
+
+    RECT stWindowArea;
+
+    if( kGetWindowArea( qwWindowID, &stWindowArea ) == FALSE ) {
+
+        return FALSE;
+
+    }
+
+    pstAreaInScreen->iX1 = pstArea->iX1 + stWindowArea.iX1;
+    pstAreaInScreen->iY1 = pstArea->iY1 + stWindowArea.iY1;
+    pstAreaInScreen->iX2 = pstArea->iX2 + stWindowArea.iX1;
+    pstAreaInScreen->iY2 = pstArea->iY2 + stWindowArea.iY1;
+
+    return TRUE;
+
+}
+
+// 윈도우를 화면에 업데이트
+BOOL kUpdateScreenByID( QWORD qwWindowID ) {
+
+    EVENT stEvent;
+    WINDOW* pstWindow;
+
+    pstWindow = kGetWindow( qwWindowID );
+
+    if( ( pstWindow == NULL ) && ( ( pstWindow->dwFlags & WINDOW_FLAGS_SHOW ) == 0 ) ) {
+
+        return FALSE;
+
+    }
+    
+    stEvent.qwType = EVENT_WINDOWMANAGER_UPDATESCREENBYID;
+    stEvent.stWindowEvent.qwWindowID = qwWindowID;
+
+    return kSendEventToWindowManager( &stEvent );
+
+}
+
+// 윈도우의 내부를 화면에 업데이트
+BOOL kUpdateScreenByWindowArea( QWORD qwWindowID, const RECT* pstArea ) {
+
+    EVENT stEvent;
+    WINDOW* pstWindow;
+
+    pstWindow = kGetWindow( qwWindowID );
+    if( ( pstWindow == NULL ) && ( ( pstWindow->dwFlags & WINDOW_FLAGS_SHOW ) == 0 ) ) {
+
+        return FALSE;
+
+    }
+
+    stEvent.qwType = EVENT_WINDOWMANAGER_UPDATESCREENBYWINDOWAREA;
+    stEvent.stWindowEvent.qwWindowID = qwWindowID;
+    kMemCpy( &( stEvent.stWindowEvent.stArea ), pstArea, sizeof( RECT ) );
+
+    return kSendEventToWindowManager( &stEvent );
+
+}
+
+// 화면 좌표로 화면을 업데이트
+BOOL kUpdateScreenByScreenArea( const RECT* pstArea ) {
+
+    EVENT stEvent;
+
+    stEvent.qwType = EVENT_WINDOWMANAGER_UPDATESCREENBYSCREENAREA;
+    stEvent.stWindowEvent.qwWindowID = WINDOW_INVALIDID;
+    kMemCpy( &( stEvent.stWindowEvent.stArea ), pstArea, sizeof( RECT ) );
+
+    return kSendEventToWindowManager( &stEvent );
+
+}
+
+// 윈도우로 이벤트 전송
+BOOL kSendEventToWindow( QWORD qwWindowID, const EVENT* pstEvent ) {
+
+    WINDOW* pstWindow;
+    BOOL bResult;
+
+    pstWindow = kGetWindowWithWindowLock( qwWindowID );
+    if( pstWindow == NULL ) {
+
+        return FALSE;
+
+    }
+
+    bResult = kPutQueue( &( pstWindow->stEventQueue ), pstEvent );
+
+    kUnlock( &( pstWindow->stLock ) );
+
+    return bResult;
+
+}
+
+// 윈도우의 이벤트 큐에 저장된 이벤트를 수신
+BOOL kReceiveEventFromWindowQueue( QWORD qwWindowID, EVENT* pstEvent ) {
+
+    WINDOW* pstWindow;
+    BOOL bResult;
+
+    pstWindow = kGetWindowWithWindowLock( qwWindowID );
+    if( pstWindow == NULL ) {
+
+        return FALSE;
+
+    }
+
+    bResult = kGetQueue( &( pstWindow->stEventQueue ), pstEvent );
+
+    kUnlock( &( pstWindow->stLock ) );
+
+    return bResult;
+
+}
+
+// 윈도우 매니저로 이벤트를 전송
+BOOL kSendEventToWindowManager( const EVENT* pstEvent ) {
+
+    BOOL bResult = FALSE;
+
+    if( kIsQueueFull( &( gs_stWindowManager.stEventQueue ) ) == FALSE ) {
+
+        kLock( &( gs_stWindowManager.stLock ) );
+
+        bResult = kPutQueue( &( gs_stWindowManager.stEventQueue ), pstEvent );
+
+        kUnlock( &( gs_stWindowManager.stLock ) );
+
+    }
+
+    return bResult;
+
+}
+
+// 윈도우 매니저의 이벤트 큐에 저장된 이벤트를 수신
+BOOL kReceiveEventFromWindowManagerQueue( EVENT* pstEvent ) {
+
+    BOOL bResult = FALSE;
+
+    if( kIsQueueEmpty( &( gs_stWindowManager.stEventQueue ) ) == FALSE ) {
+
+        kLock( &( gs_stWindowManager.stLock ) );
+
+        bResult = kGetQueue( &( gs_stWindowManager.stEventQueue ), pstEvent );
+
+        kUnlock( &( gs_stWindowManager.stLock ) );
+
+    }
+
+    return bResult;
+
+}
+
+// 마우스 이벤트 자료구조를 설정
+BOOL kSetMouseEvent( QWORD qwWindowID, QWORD qwEventType, int iMouseX, int iMouseY, BYTE bButtonStatus, EVENT* pstEvent ) {
+
+    POINT stMouseXYInWindow;
+    POINT stMouseXY;
+
+    switch( qwEventType ) {
+
+    case EVENT_MOUSE_MOVE:
+    case EVENT_MOUSE_LBUTTONDOWN:
+    case EVENT_MOUSE_LBUTTONUP:
+    case EVENT_MOUSE_RBUTTONDOWN:
+    case EVENT_MOUSE_RBUTTONUP:
+    case EVENT_MOUSE_MBUTTONDOWN:
+    case EVENT_MOUSE_MBUTTONUP:
+        stMouseXY.iX = iMouseX;
+        stMouseXY.iY = iMouseY;
+
+        if( kConvertPointScreenToClient( qwWindowID, &stMouseXY, &stMouseXYInWindow ) == FALSE ) {
+
+            return FALSE;
+
+        }
+        
+        pstEvent->qwType = qwEventType;
+        pstEvent->stMouseEvent.qwWindowID = qwWindowID;
+        pstEvent->stMouseEvent.bButtonStatus = bButtonStatus;
+        kMemCpy( &( pstEvent->stMouseEvent.stPoint ), &stMouseXYInWindow, sizeof( POINT ) );
+
+        break;
+
+    default:
+        return FALSE;
+        break;
+
+    }
+
+    return TRUE;
+
+}
+
+// 윈도우 이벤트 자료구조를 생성
+BOOL kSetWindowEvent( QWORD qwWindowID, QWORD qwEventType, EVENT* pstEvent ) {
+
+    RECT stArea;
+
+    switch( qwEventType ) {
+
+    case EVENT_WINDOW_SELECT:
+    case EVENT_WINDOW_DESELECT:
+    case EVENT_WINDOW_MOVE:
+    case EVENT_WINDOW_RESIZE:
+    case EVENT_WINDOW_CLOSE:
+        pstEvent->qwType = qwEventType;
+        pstEvent->stWindowEvent.qwWindowID = qwWindowID;
+
+        if( kGetWindowArea( qwWindowID, &stArea ) == FALSE ) {
+
+            return FALSE;
+
+        }
+
+        kMemCpy( &( pstEvent->stWindowEvent.stArea ), &stArea, sizeof( RECT ) );
+        break;
+
+    default:
+        return FALSE;
+        break;
+
+    }
+
+    return TRUE;
+
+}
+
+// 키 이벤트 자료구조를 설정
+void kSetKeyEvent( QWORD qwWindow, const KEYDATA* pstKeyData, EVENT* pstEvent ) {
+
+    if( pstKeyData->bFlags & KEY_FLAGS_DOWN ) {
+
+        pstEvent->qwType = EVENT_KEY_DOWN;
+
+    } else {
+
+        pstEvent->qwType = EVENT_KEY_UP;
+
+    }
+
+    pstEvent->stKeyEvent.bASCIICode = pstKeyData->bASCIICode;
+    pstEvent->stKeyEvent.bScanCode = pstKeyData->bScanCode;
+    pstEvent->stKeyEvent.bFlags = pstKeyData->bFlags;
+
+}
+
 // 윈도우 화면 버퍼에 윈도우 테두리 그리기
 BOOL kDrawWindowFrame( QWORD qwWindowID ) {
 
@@ -532,7 +1199,7 @@ BOOL kDrawWindowBackground( QWORD qwWindowID ) {
 
     }
 
-    kInternalDrawRect( &stArea, pstWindow->pstWindowBuffer, iX, iY, iWidth - 1 -iX, iHeight - 1 - iX, WINDOW_COLOR_BACKGROUND, TRUE );
+    kInternalDrawRect( &stArea, pstWindow->pstWindowBuffer, iX, iY, iWidth - 1 - iX, iHeight - 1 - iX, WINDOW_COLOR_BACKGROUND, TRUE );
 
     kUnlock( &( pstWindow->stLock ) );
 
@@ -541,7 +1208,7 @@ BOOL kDrawWindowBackground( QWORD qwWindowID ) {
 }
 
 // 윈도우 화면 버퍼에 윈도우 제목 표시줄 그리기
-BOOL kDrawWindowTitle( QWORD qwWindowID, const char* pcTitle ) {
+BOOL kDrawWindowTitle( QWORD qwWindowID, const char* pcTitle, BOOL bSelectedTitle ) {
 
     WINDOW* pstWindow;
     int iWidth;
@@ -550,6 +1217,7 @@ BOOL kDrawWindowTitle( QWORD qwWindowID, const char* pcTitle ) {
     int iY;
     RECT stArea;
     RECT stButtonArea;
+    COLOR stTitleBarColor;
 
     pstWindow = kGetWindowWithWindowLock( qwWindowID );
     if( pstWindow == NULL ) {
@@ -563,9 +1231,19 @@ BOOL kDrawWindowTitle( QWORD qwWindowID, const char* pcTitle ) {
 
     kSetRectangleData( 0, 0, iWidth - 1, iHeight - 1, &stArea );
 
-    kInternalDrawRect( &stArea, pstWindow->pstWindowBuffer, 0, 3, iWidth - 1, WINDOW_TITLEBAR_HEIGHT - 1, WINDOW_COLOR_TITLEBARBACKGROUND, TRUE );
+    if( bSelectedTitle == TRUE ) {
 
-    kInternalDrawText( &stArea, pstWindow->pstWindowBuffer, 6, 3, WINDOW_COLOR_TITLEBARTEXT, WINDOW_COLOR_TITLEBARBACKGROUND, pcTitle, kStrLen( pcTitle ) );
+        stTitleBarColor = WINDOW_COLOR_TITLEBARACTIVEBACKGROUND;
+
+    } else {
+
+        stTitleBarColor = WINDOW_COLOR_TITLEBARINACTIVEBACKGROUND;
+
+    }
+
+    kInternalDrawRect( &stArea, pstWindow->pstWindowBuffer, 0, 3, iWidth - 1, WINDOW_TITLEBAR_HEIGHT - 1, stTitleBarColor, TRUE );
+
+    kInternalDrawText( &stArea, pstWindow->pstWindowBuffer, 6, 3, WINDOW_COLOR_TITLEBARTEXT, stTitleBarColor, pcTitle, kStrLen( pcTitle ) );
 
     kInternalDrawLine( &stArea, pstWindow->pstWindowBuffer, 1, 1, iWidth - 1, 1, WINDOW_COLOR_TITLEBARBRIGHT1 );
     kInternalDrawLine( &stArea, pstWindow->pstWindowBuffer, 1, 2, iWidth - 1, 2, WINDOW_COLOR_TITLEBARBRIGHT2 );
