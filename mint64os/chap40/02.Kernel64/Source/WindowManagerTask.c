@@ -4,6 +4,7 @@
 #include "VBE.h"
 #include "Mouse.h"
 #include "Task.h"
+#include "GUITask.h"
 
 // 윈도우 매니저 태스크
 void kStartWindowManager( void ) {
@@ -54,8 +55,6 @@ BOOL kProcessMouseData( void ) {
     EVENT stEvent;
     WINDOWMANAGER* pstWindowManager;
     char vcTempTitle[ WINDOW_TITLEMAXLENGTH ];
-    static int iWindowCount = 0;
-    QWORD qwWindowID;
 
     if( kGetMouseDataFromMouseQueue( &bButtonStatus, &iRelativeX, &iRelativeY ) == FALSE ) {
 
@@ -97,8 +96,6 @@ BOOL kProcessMouseData( void ) {
                     kSetWindowEvent( qwWindowIDUnderMouse, EVENT_WINDOW_CLOSE, &stEvent );
                     kSendEventToWindow( qwWindowIDUnderMouse, &stEvent );
 
-                    kDeleteWindow( qwWindowIDUnderMouse );
-
                 } else {
 
                     pstWindowManager->bWindowMoveMode = TRUE;
@@ -137,13 +134,7 @@ BOOL kProcessMouseData( void ) {
             kSetMouseEvent( qwWindowIDUnderMouse, EVENT_MOUSE_RBUTTONDOWN, iMouseX, iMouseY, bButtonStatus, &stEvent );
             kSendEventToWindow( qwWindowIDUnderMouse, &stEvent );
 
-            kSPrintf( vcTempTitle, "MINT64 OS Test Window %d", iWindowCount++ );
-            qwWindowID = kCreateWindow( iMouseX - 10, iMouseY - WINDOW_TITLEBAR_HEIGHT / 2, 400, 200, WINDOW_FLAGS_DRAWFRAME | WINDOW_FLAGS_DRAWTITLE, vcTempTitle );
-
-            kDrawText( qwWindowID, 10, WINDOW_TITLEBAR_HEIGHT + 10, RGB( 255, 255, 255 ), WINDOW_COLOR_BACKGROUND, "This is real Window", 20 );
-            kDrawText( qwWindowID, 10, WINDOW_TITLEBAR_HEIGHT + 30, RGB( 255, 255, 255 ), WINDOW_COLOR_BACKGROUND, "Now you can move and select window", 35 );
-            kDrawText( qwWindowID, 10, WINDOW_TITLEBAR_HEIGHT + 50, RGB( 255, 255, 255 ), WINDOW_COLOR_BACKGROUND, "Chap39 END", 11 );
-            kShowWindow( qwWindowID, TRUE );
+            kCreateTask( TASK_FLAGS_LOW | TASK_FLAGS_THREAD, NULL, NULL, ( QWORD ) kHelloWorldGUITask, TASK_LOADBALANCINGID );
 
         } else {
 

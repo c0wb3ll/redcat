@@ -25,6 +25,9 @@ FileSystem.o: ../Source/FileSystem.c ../Source/FileSystem.h \
  ../Source/Types.h ../Source/Synchronization.h ../Source/HardDisk.h \
  ../Source/CacheManager.h ../Source/DynamicMemory.h ../Source/Task.h \
  ../Source/List.h ../Source/Utility.h ../Source/RAMDisk.h
+GUITask.o: ../Source/GUITask.c ../Source/GUITask.h ../Source/Types.h \
+ ../Source/Window.h ../Source/Synchronization.h ../Source/2DGraphics.h \
+ ../Source/List.h ../Source/Queue.h ../Source/Keyboard.h
 HardDisk.o: ../Source/HardDisk.c ../Source/HardDisk.h ../Source/Types.h \
  ../Source/Synchronization.h
 IOAPIC.o: ../Source/IOAPIC.c ../Source/IOAPIC.h ../Source/Types.h \
@@ -76,7 +79,7 @@ Task.o: ../Source/Task.c ../Source/Task.h ../Source/Types.h \
  ../Source/MultiProcessor.h
 Utility.o: ../Source/Utility.c ../Source/Utility.h ../Source/Types.h \
  ../Source/AssemblyUtility.h ../Source/Task.h ../Source/List.h \
- ../Source/Synchronization.h
+ ../Source/Synchronization.h ../Source/VBE.h
 VBE.o: ../Source/VBE.c ../Source/VBE.h ../Source/Types.h
 Window.o: ../Source/Window.c ../Source/Window.h ../Source/Types.h \
  ../Source/Synchronization.h ../Source/2DGraphics.h ../Source/List.h \
@@ -86,4 +89,4 @@ WindowManagerTask.o: ../Source/WindowManagerTask.c ../Source/Types.h \
  ../Source/Window.h ../Source/Synchronization.h ../Source/2DGraphics.h \
  ../Source/List.h ../Source/Queue.h ../Source/Keyboard.h \
  ../Source/WindowManagerTask.h ../Source/VBE.h ../Source/Mouse.h \
- ../Source/Task.h
+ ../Source/Task.h ../Source/GUITask.h
