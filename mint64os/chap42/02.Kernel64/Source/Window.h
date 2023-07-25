@@ -254,7 +254,7 @@ void kGetCursorPosition( int* piX, int* piY );
 
 BOOL kCreateDrawBitmap( const RECT* pstArea, DRAWBITMAP* pstDrawBitmap );
 static BOOL kFillDrawBitmap( DRAWBITMAP* pstDrawBitmap, RECT* pstArea, BOOL bFill );
-inline BOOL kGetStartPositionInDrawBitmap( const DRAWBITMAP* pstDrawBitmap, int iX, int iY, int* piByteOffset, int* piBitOffset );
-inline BOOL kIsDrawBitmapAllOff( const DRAWBITMAP* pstDrawBitmap );
+extern inline BOOL kGetStartPositionInDrawBitmap( const DRAWBITMAP* pstDrawBitmap, int iX, int iY, int* piByteOffset, int* piBitOffset );
+extern inline BOOL kIsDrawBitmapAllOff( const DRAWBITMAP* pstDrawBitmap );
 
 #endif /*__WINDOW_H__*/

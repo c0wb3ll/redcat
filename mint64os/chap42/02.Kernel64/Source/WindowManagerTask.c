@@ -6,6 +6,7 @@
 #include "Task.h"
 #include "GUITask.h"
 #include "Font.h"
+#include "ApplicationPanelTask.h"
 
 // 윈도우 매니저 태스크
 void kStartWindowManager( void ) {
@@ -15,48 +16,14 @@ void kStartWindowManager( void ) {
     BOOL bKeyDataResult;
     BOOL bEventQueueResult;
 
-    QWORD qwLastTickCount;
-    QWORD qwPreviousLoopExecutionCount;
-    QWORD qwLoopExecutionCount;
-    QWORD qwMinLoopExecutionCount;
-    char vcTemp[ 40 ];
-    RECT stLoopCountArea;
-    QWORD qwBackgroundWindowID;
-
     kInitializeGUISystem();
 
     kGetCursorPosition( &iMouseX, &iMouseY );
     kMoveCursor( iMouseX, iMouseY );
 
-    qwLastTickCount = kGetTickCount();
-    qwPreviousLoopExecutionCount = 0;
-    qwLoopExecutionCount = 0;
-    qwMinLoopExecutionCount = 0xFFFFFFFFFFFFFFFF;
-    qwBackgroundWindowID = kGetBackgroundWindowID();
+    kCreateTask( TASK_FLAGS_SYSTEM | TASK_FLAGS_THREAD | TASK_FLAGS_LOW, 0, 0, ( QWORD ) kApplicationPanelGUITask, TASK_LOADBALANCINGID );
 
     while( 1 ) {
-
-        if( kGetTickCount() - qwLastTickCount > 1000 ) {
-
-            qwLastTickCount = kGetTickCount();
-
-            if( ( qwLoopExecutionCount - qwPreviousLoopExecutionCount ) < qwMinLoopExecutionCount ) {
-
-                qwMinLoopExecutionCount = qwLoopExecutionCount - qwPreviousLoopExecutionCount;
-
-            }
-
-            qwPreviousLoopExecutionCount = qwLoopExecutionCount;
-            
-            kSPrintf( vcTemp, "MIN Loop Execution Count:%d ", qwMinLoopExecutionCount );
-            kDrawText( qwBackgroundWindowID, 0, 0, RGB( 255, 255, 255 ), RGB( 0, 0, 0 ), vcTemp, kStrLen( vcTemp ) );
-
-            kSetRectangleData( 0, 0, kStrLen( vcTemp ) * FONT_ENGLISHWIDTH, FONT_ENGLISHHEIGHT, &stLoopCountArea );
-            kRedrawWindowByArea( &stLoopCountArea, qwBackgroundWindowID );
-
-        }
-
-        qwLoopExecutionCount++;
 
         bMouseDataResult = kProcessMouseData();
 
@@ -193,8 +160,6 @@ BOOL kProcessMouseData( void ) {
 
             kSetMouseEvent( qwWindowIDUnderMouse, EVENT_MOUSE_RBUTTONDOWN, iMouseX, iMouseY, bButtonStatus, &stEvent );
             kSendEventToWindow( qwWindowIDUnderMouse, &stEvent );
-
-            kCreateTask( TASK_FLAGS_LOW | TASK_FLAGS_THREAD, NULL, NULL, ( QWORD ) kHelloWorldGUITask, TASK_LOADBALANCINGID );
 
         } else {
 
