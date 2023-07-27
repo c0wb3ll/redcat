@@ -2,6 +2,9 @@
 #include "Window.h"
 #include "MultiProcessor.h"
 #include "Font.h"
+#include "Console.h"
+#include "Task.h"
+#include "ConsoleShell.h"
 
 // 기본 GUI 태스크의 코드
 void kBaseGUITask( void ) {
@@ -463,5 +466,169 @@ static void kDrawMemoryInformation( QWORD qwWindowID, int iY, int iWindowWidth )
 
     kSetRectangleData( 0, iY, iWindowWidth, iY + SYSTEMMONITOR_MEMORY_HEIGHT, &stArea );
     kUpdateScreenByWindowArea( qwWindowID, &stArea );
+
+}
+
+// GUI 버전의 콘솔 쉘 태스크
+
+// 이전 화면 버퍼의 값을 보관하는 영역
+static CHARACTER gs_vstPreviousScreenBuffer[ CONSOLE_WIDTH * CONSOLE_HEIGHT ];
+
+// GUI 버전의 콘솔 쉘 태스크
+void kGUIConsoleShellTask( void ) {
+
+    static QWORD s_qwWindowID = WINDOW_INVALIDID;
+    int iWindowWidth, iWindowHeight;
+    EVENT stReceivedEvent;
+    KEYEVENT* pstKeyEvent;
+    RECT stScreenArea;
+    KEYDATA stKeyData;
+    TCB* pstConsoleShellTask;
+    QWORD qwConsoleShellTaskID;
+
+    if( kIsGraphicMode() == FALSE ) {
+
+        kPrintf( "This task can run only GUI mode\n" );
+        return ;
+
+    }
+
+    if( s_qwWindowID != WINDOW_INVALIDID ) {
+
+        kMoveWindowToTop( s_qwWindowID );
+        return ;
+
+    }
+
+    kGetScreenArea( &stScreenArea );
+
+    iWindowWidth = CONSOLE_WIDTH * FONT_ENGLISHWIDTH + 4;
+    iWindowHeight = CONSOLE_HEIGHT * FONT_ENGLISHHEIGHT + WINDOW_TITLEBAR_HEIGHT + 2;
+
+    s_qwWindowID = kCreateWindow( ( stScreenArea.iX2 - iWindowWidth ) / 2, ( stScreenArea.iY2 - iWindowHeight ) / 2, iWindowWidth, iWindowHeight, WINDOW_FLAGS_DEFAULT, "Console Shell for GUI" );
+
+    if( s_qwWindowID == WINDOW_INVALIDID ) {
+
+        return ;
+
+    }
+
+    kSetConsoleShellExitFlag( FALSE );
+    pstConsoleShellTask = kCreateTask( TASK_FLAGS_LOW | TASK_FLAGS_THREAD, 0, 0, ( QWORD ) kStartConsoleShell, TASK_LOADBALANCINGID );
+    if( pstConsoleShellTask == NULL ) {
+
+        kDeleteWindow( s_qwWindowID );
+        return ;
+
+    }
+
+    qwConsoleShellTaskID = pstConsoleShellTask->stLink.qwID;
+
+    kMemSet( gs_vstPreviousScreenBuffer, 0xFF, sizeof( gs_vstPreviousScreenBuffer ) );
+
+    while( 1 ) {
+
+        kProcessConsoleBuffer( s_qwWindowID );
+
+        if( kReceiveEventFromWindowQueue( s_qwWindowID, & stReceivedEvent ) == FALSE ) {
+
+            kSleep( 0 );
+            continue;
+
+        }
+
+        switch( stReceivedEvent.qwType ) {
+
+        case EVENT_KEY_DOWN:
+        case EVENT_KEY_UP:
+            pstKeyEvent = &( stReceivedEvent.stKeyEvent );
+            stKeyData.bASCIICode = pstKeyEvent->bASCIICode;
+            stKeyData.bFlags = pstKeyEvent->bFlags;
+            stKeyData.bScanCode = pstKeyEvent->bScanCode;
+
+            kPutKeyToGUIKeyQueue( &stKeyData );
+            break;
+
+        case EVENT_WINDOW_CLOSE:
+            kSetConsoleShellExitFlag( TRUE );
+            while( kIsTaskExist( qwConsoleShellTaskID ) == TRUE ) {
+
+                kSleep( 1 );
+
+            }
+
+            kDeleteWindow( s_qwWindowID );
+            s_qwWindowID = WINDOW_INVALIDID;
+
+            return ;
+
+            break;
+
+        default:
+            break;
+
+        }
+
+    }
+
+}
+
+// 화면 버퍼의 변경된 내용을 GUI 콘솔 셸 윈도우 화면에 업데이트
+static void kProcessConsoleBuffer( QWORD qwWindowID ) {
+
+    int i;
+    int j;
+    CONSOLEMANAGER* pstManager;
+    CHARACTER* pstScreenBuffer;
+    CHARACTER* pstPreviousScreenBuffer;
+    RECT stLineArea;
+    BOOL bChanged;
+    static QWORD s_qwLastTickCount = 0;
+    BOOL bFullRedraw;
+
+    pstManager = kGetConsoleManager();
+    pstScreenBuffer = pstManager->pstScreenBuffer;
+    pstPreviousScreenBuffer = gs_vstPreviousScreenBuffer;
+
+    if( kGetTickCount() - s_qwLastTickCount > 5000 ) {
+
+        s_qwLastTickCount = kGetTickCount();
+        bFullRedraw = TRUE;
+
+    } else {
+
+        bFullRedraw = FALSE;
+
+    }
+
+    for( j = 0; j < CONSOLE_HEIGHT; j++ ) {
+
+        bChanged = FALSE;
+
+        for( i = 0; i < CONSOLE_WIDTH; i++ ) {
+
+            if( ( pstScreenBuffer->bCharactor != pstPreviousScreenBuffer->bCharactor ) || ( bFullRedraw == TRUE ) ) {
+
+                kDrawText( qwWindowID, i * FONT_ENGLISHWIDTH + 2, j * FONT_ENGLISHHEIGHT + WINDOW_TITLEBAR_HEIGHT, RGB( 255, 255, 255 ), RGB( 0, 0, 0 ), &( pstScreenBuffer->bCharactor ), 1 );
+
+                kMemCpy( pstPreviousScreenBuffer, pstScreenBuffer, sizeof( CHARACTER ) );
+                bChanged = TRUE;
+
+            }
+
+            pstScreenBuffer++;
+            pstPreviousScreenBuffer++;
+
+        }
+
+        if( bChanged == TRUE ) {
+
+            kSetRectangleData( 2, j * FONT_ENGLISHHEIGHT + WINDOW_TITLEBAR_HEIGHT, 5 + FONT_ENGLISHWIDTH * CONSOLE_WIDTH, ( j + 1 ) * FONT_ENGLISHHEIGHT + WINDOW_TITLEBAR_HEIGHT - 1, &stLineArea );
+
+            kUpdateScreenByWindowArea( qwWindowID, &stLineArea );
+
+        }
+
+    }
 
 }
