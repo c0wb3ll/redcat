@@ -4,6 +4,7 @@
 #include "Font.h"
 #include "DynamicMemory.h"
 #include "Utility.h"
+#include "JPEG.h"
 
 static WINDOWPOOLMANAGER gs_stWindowPoolManager;
 static WINDOWMANAGER gs_stWindowManager;
@@ -162,6 +163,7 @@ void kInitializeGUISystem( void ) {
     qwBackgroundWindowID = kCreateWindow( 0, 0, pstModeInfo->wXResolution, pstModeInfo->wYResolution, 0, WINDOW_BACKGROUNDWINDOWTITLE );
     gs_stWindowManager.qwBackgroundWindowID = qwBackgroundWindowID;
     kDrawRect( qwBackgroundWindowID, 0, 0, pstModeInfo->wXResolution - 1, pstModeInfo->wYResolution - 1, WINDOW_COLOR_SYSTEMBACKGROUND, TRUE );
+    kDrawBackgroundImage();
     kShowWindow( qwBackgroundWindowID, TRUE );
 
 }
@@ -1728,6 +1730,141 @@ BOOL kDrawText( QWORD qwWindowID, int iX, int iY, COLOR stTextColor, COLOR stBac
 
 }
 
+
+// 윈도우 화면 버퍼에 버퍼의 내용을 한번에 전송
+BOOL kBitBlt( QWORD qwWindowID, int iX, int iY, COLOR* pstBuffer, int iWidth, int iHeight ) {
+
+    WINDOW* pstWindow;
+    RECT stWindowArea;
+    RECT stBufferArea;
+    RECT stOverlappedArea;
+    int iWindowWidth;
+    int iOverlappedWidth;
+    int iOverlappedHeight;
+    int i;
+    int j;
+    int iWindowPosition;
+    int iBufferPosition;
+    int iStartX;
+    int iStartY;
+
+    pstWindow = kGetWindowWithWindowLock( qwWindowID );
+    if( pstWindow == NULL ) {
+
+        return FALSE;
+
+    }
+
+    kSetRectangleData( 0, 0, pstWindow->stArea.iX2 - pstWindow->stArea.iX1, pstWindow->stArea.iY2 - pstWindow->stArea.iY1, &stWindowArea );
+
+    kSetRectangleData( iX, iY, iX + iWidth - 1, iY + iHeight - 1, &stBufferArea );
+
+    if( kGetOverlappedRectangle( &stWindowArea, &stBufferArea, &stOverlappedArea ) == FALSE ) {
+
+        kUnlock( &pstWindow->stLock );
+
+        return FALSE;
+
+    }
+
+    iWindowWidth = kGetRectangleWidth( &stWindowArea );
+    iOverlappedWidth = kGetRectangleWidth( &stOverlappedArea );
+    iOverlappedHeight = kGetRectangleHeight( &stOverlappedArea );
+
+    if( iX < 0 ) {
+
+        iStartX = iX;
+
+    } else {
+
+        iStartX = 0;
+
+    }
+
+    if( iY < 0 ) {
+
+        iStartY = iY;
+
+    } else {
+
+        iStartY = 0;
+
+    }
+
+    for( j = 0; j < iOverlappedHeight; j++ ) {
+
+        iWindowPosition = ( iWindowWidth * ( stOverlappedArea.iY1 + j ) ) + stOverlappedArea.iX1;
+        iBufferPosition = ( iWidth * j + iStartY ) + iStartX;
+
+        kMemCpy( pstWindow->pstWindowBuffer + iWindowPosition, pstBuffer + iBufferPosition, iOverlappedWidth * sizeof( COLOR ) );
+
+    }
+
+    kUnlock( &pstWindow->stLock );
+
+    return TRUE;
+
+}
+
+// 배경화면 이미지 파일이 저장된 데이터 버퍼와 버퍼의 크기
+extern unsigned char g_vbWallPaper[ 0 ];
+extern unsigned int size_g_vbWallPaper;
+
+// 배경화면 윈도우에 배경 화면 이미지를 출력
+void kDrawBackgroundImage( void ) {
+
+    JPEG* pstJpeg;
+    COLOR* pstOutputBuffer;
+    WINDOWMANAGER* pstWindowManager;
+    int i;
+    int j;
+    int iMiddleX;
+    int iMiddleY;
+    int iScreenWidth;
+    int iScreenHeight;
+
+    pstWindowManager = kGetWindowManager();
+
+    pstJpeg = ( JPEG* ) kAllocateMemory( sizeof( JPEG ) );
+
+    if( kJPEGInit( pstJpeg, g_vbWallPaper, size_g_vbWallPaper ) == FALSE ) {
+
+        return ;
+            
+    }
+
+    pstOutputBuffer = ( COLOR* ) kAllocateMemory( pstJpeg->width * pstJpeg->height * sizeof( COLOR ) );
+
+    if( pstOutputBuffer == NULL ) {
+
+        kFreeMemory( pstJpeg );
+
+        return ;
+
+    }
+
+    if( kJPEGDecode( pstJpeg, pstOutputBuffer ) == FALSE ) {
+
+        kFreeMemory( pstOutputBuffer );
+        kFreeMemory( pstJpeg );
+
+        return ;
+
+    }
+
+    iScreenWidth = kGetRectangleWidth( &( pstWindowManager->stScreenArea ) );
+    iScreenHeight = kGetRectangleHeight( &( pstWindowManager->stScreenArea ) );
+
+    iMiddleX = ( iScreenWidth - pstJpeg->width ) / 2;
+    iMiddleY = ( iScreenHeight - pstJpeg->height ) / 2;
+
+    kBitBlt( pstWindowManager->qwBackgroundWindowID, iMiddleX, iMiddleY, pstOutputBuffer, pstJpeg->width, pstJpeg->height );
+
+    kFreeMemory( pstOutputBuffer );
+    kFreeMemory( pstJpeg );
+
+}
+
 // 화면 업데이트에 사용할 비트맵 생성
 BOOL kCreateDrawBitmap( const RECT* pstArea, DRAWBITMAP* pstDrawBitmap ) {
 
@@ -1776,7 +1913,7 @@ static BOOL kFillDrawBitmap( DRAWBITMAP* pstDrawBitmap, RECT* pstArea, BOOL bFil
 
         }
 
-        for( iOffsetX = 0; iOffsetX < iOverlappedWidth;  ) {
+        for( iOffsetX = 0; iOffsetX < iOverlappedWidth; ) {
 
             if( ( iBitOffset == 0x00 ) && ( ( iOverlappedWidth - iOffsetX ) >= 8 ) ) {
 

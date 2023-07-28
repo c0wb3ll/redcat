@@ -251,6 +251,8 @@ BOOL kDrawText( QWORD qwWindowID, int iX, int iY, COLOR stTextColor, COLOR stBac
 static void kDrawCursor( int iX, int iY );
 void kMoveCursor( int iX, int iY );
 void kGetCursorPosition( int* piX, int* piY );
+BOOL kBitBlt( QWORD qwWindowID, int iX, int iY, COLOR* pstBuffer, int iWidth, int iHeight );
+void kDrawBackgroundImage( void );
 
 BOOL kCreateDrawBitmap( const RECT* pstArea, DRAWBITMAP* pstDrawBitmap );
 static BOOL kFillDrawBitmap( DRAWBITMAP* pstDrawBitmap, RECT* pstArea, BOOL bFill );
