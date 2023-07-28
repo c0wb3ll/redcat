@@ -13,8 +13,9 @@ while getopts da: opts; do
         ;;
     s) O_SINGLE_CORE=""
         ;;
+    r) qemu-img craete HDD.img 20M
+	;;
     esac
 done
 
-qemu-img create HDD.img 20M
 qemu-system-${O_ARCH} -L . -m 64 -fda ${PWD}/Disk.img ${O_DISK} --boot a -rtc base=localtime -M pc -serial tcp::4444,server,nowait ${O_SINGLE_CORE} ${O_DEBUG}
