@@ -40,7 +40,7 @@
 #define TASK_MAXCOUNT                   1024
 // 스택 풀과 스택의 크기        
 #define TASK_STACKPOOLADDRESS           ( TASK_TCBPOOLADDRESS + sizeof( TCB ) * TASK_MAXCOUNT )
-#define TASK_STACKSIZE                  8192
+#define TASK_STACKSIZE                  ( 64 * 1024 )
 // 유효하지 않은 태스크 ID      
 #define TASK_INVALIDID                  0xFFFFFFFFFFFFFFFF
 // 태스크가 최대로 쓸 수 있는 프        로세서 시간 ms
@@ -62,6 +62,7 @@
 #define TASK_FLAGS_PROCESS              0x2000000000000000
 #define TASK_FLAGS_THREAD               0x1000000000000000
 #define TASK_FLAGS_IDLE                 0x0800000000000000
+#define TASK_FLAGS_USERLEVEL            0x0400000000000000
 
 // 함수 매크로      
 #define GETPRIORITY( x )                ( ( x ) & 0xFF )

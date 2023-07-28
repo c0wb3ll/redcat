@@ -1,6 +1,7 @@
 #include "Task.h"
 #include "Descriptor.h"
 #include "MultiProcessor.h"
+#include "DynamicMemory.h"
 
 // 스케줄러 관련 자료구조
 static SCHEDULER gs_vstScheduler[ MAXPROCESSORCOUNT ];
@@ -107,12 +108,22 @@ TCB* kCreateTask( QWORD qwFlags, void* pvMemoryAddress, QWORD qwMemorySize, QWOR
         
     }
 
+    pvStackAddress = kAllocateMemory( TASK_STACKSIZE );
+    if( pvStackAddress == NULL ) {
+
+        kFreeTCB( pstTask->stLink.qwID );
+        
+        return NULL;
+
+    }
+
     kLockForSpinLock( &( gs_vstScheduler[ bCurrentAPICID ].stSpinLock ) );
 
     pstProcess = kGetProcessByThread( kGetRunningTask( bCurrentAPICID ) );
     if( pstProcess == NULL ) {
 
         kFreeTCB( pstTask->stLink.qwID );
+        kFreeMemory( pvStackAddress );
         kUnlockForSpinLock( &( gs_vstScheduler[ bCurrentAPICID ].stSpinLock ) );
         
         return NULL;
@@ -138,8 +149,6 @@ TCB* kCreateTask( QWORD qwFlags, void* pvMemoryAddress, QWORD qwMemorySize, QWOR
     pstTask->stThreadLink.qwID = pstTask->stLink.qwID;
 
     kUnlockForSpinLock( &( gs_vstScheduler[ bCurrentAPICID ].stSpinLock ) );
-
-    pvStackAddress = ( void* ) ( TASK_STACKPOOLADDRESS + ( TASK_STACKSIZE * GETTCBOFFSET( pstTask->stLink.qwID ) ) );
 
     kSetUpTask( pstTask, qwFlags, qwEntryPointAddress, pvStackAddress, TASK_STACKSIZE );
 
@@ -167,16 +176,29 @@ static void kSetUpTask( TCB* pstTCB, QWORD qwFlags, QWORD qwEntryPointAddress, v
 
     *( QWORD * ) ( ( QWORD ) pvStackAddress + qwStackSize - 8 ) = ( QWORD ) kExitTask;
 
-    pstTCB->stContext.vqRegister[ TASK_CSOFFSET ] = GDT_KERNELCODESEGMENT;
-    pstTCB->stContext.vqRegister[ TASK_DSOFFSET ] = GDT_KERNELDATASEGMENT;
-    pstTCB->stContext.vqRegister[ TASK_ESOFFSET ] = GDT_KERNELDATASEGMENT;
-    pstTCB->stContext.vqRegister[ TASK_FSOFFSET ] = GDT_KERNELDATASEGMENT;
-    pstTCB->stContext.vqRegister[ TASK_GSOFFSET ] = GDT_KERNELDATASEGMENT;
-    pstTCB->stContext.vqRegister[ TASK_SSOFFSET ] = GDT_KERNELDATASEGMENT;
+    if( ( qwFlags & TASK_FLAGS_USERLEVEL ) == 0 ) {
+
+        pstTCB->stContext.vqRegister[ TASK_CSOFFSET ] = GDT_KERNELCODESEGMENT | SELECTOR_RPL_0;
+        pstTCB->stContext.vqRegister[ TASK_DSOFFSET ] = GDT_KERNELDATASEGMENT | SELECTOR_RPL_0;
+        pstTCB->stContext.vqRegister[ TASK_ESOFFSET ] = GDT_KERNELDATASEGMENT | SELECTOR_RPL_0;
+        pstTCB->stContext.vqRegister[ TASK_FSOFFSET ] = GDT_KERNELDATASEGMENT | SELECTOR_RPL_0;
+        pstTCB->stContext.vqRegister[ TASK_GSOFFSET ] = GDT_KERNELDATASEGMENT | SELECTOR_RPL_0;
+        pstTCB->stContext.vqRegister[ TASK_SSOFFSET ] = GDT_KERNELDATASEGMENT | SELECTOR_RPL_0;
+
+    } else {
+
+        pstTCB->stContext.vqRegister[ TASK_CSOFFSET ] = GDT_USERCODESEGMENT | SELECTOR_RPL_3;
+        pstTCB->stContext.vqRegister[ TASK_DSOFFSET ] = GDT_USERDATASEGMENT | SELECTOR_RPL_3;
+        pstTCB->stContext.vqRegister[ TASK_ESOFFSET ] = GDT_USERDATASEGMENT | SELECTOR_RPL_3;
+        pstTCB->stContext.vqRegister[ TASK_FSOFFSET ] = GDT_USERDATASEGMENT | SELECTOR_RPL_3;
+        pstTCB->stContext.vqRegister[ TASK_GSOFFSET ] = GDT_USERDATASEGMENT | SELECTOR_RPL_3;
+        pstTCB->stContext.vqRegister[ TASK_SSOFFSET ] = GDT_USERDATASEGMENT | SELECTOR_RPL_3;
+
+    }
 
     pstTCB->stContext.vqRegister[ TASK_RIPOFFSET ] = qwEntryPointAddress;
 
-    pstTCB->stContext.vqRegister[ TASK_RFLAGSOFFSET ] |= 0x0200;
+    pstTCB->stContext.vqRegister[ TASK_RFLAGSOFFSET ] |= 0x3200;
     
     pstTCB->pvStackAddress = pvStackAddress;
     pstTCB->qwStackSize = qwStackSize;
@@ -1028,6 +1050,7 @@ void kIdleTask( void ) {
                 }
 
                 qwTaskID = pstTask->stLink.qwID;
+                kFreeMemory( pstTask->pvStackAddress );
                 kFreeTCB( qwTaskID );
                 kPrintf( "IDLE: Task ID[0x%q] is completely ended.\n", qwTaskID );
 

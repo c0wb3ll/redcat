@@ -16,7 +16,7 @@
 #define PAGE_FLAGS_PAT          0x00001000  // Page Attribute Table Index
 #define PAGE_FLAGS_EXB          0x80000000  // Execute Disable Bit
 
-#define PAGE_FLAGS_DEFAULT      (PAGE_FLAGS_P | PAGE_FLAGS_RW)
+#define PAGE_FLAGS_DEFAULT      ( PAGE_FLAGS_P | PAGE_FLAGS_RW )
 #define PAGE_TABLESIZE          0x1000
 #define PAGE_MAXENTRYCOUNT      0x200
 #define PAGE_DEFAULTSIZE       0x200000
