@@ -25,5 +25,7 @@ void kSetTS( void );
 void kClearTS( void );
 void kEnableGlobalLocalAPIC( void );
 void kPause( void );
+void kReadMSR( QWORD qwMSRAddress, QWORD* pqwRDX, QWORD* pqwRAX );
+void kWriteMSR( QWORD qwMSRAddress, QWORD qwRDX, QWORD qwRAX );
 
 #endif /*__ASSEMBLYUTILITY_H__*/

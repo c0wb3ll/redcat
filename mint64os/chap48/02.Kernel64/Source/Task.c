@@ -1029,7 +1029,11 @@ void kIdleTask( void ) {
 
                     } else {
 
-                        // TODO: 추후 코드 삽입
+                        if( pstTask->qwFlags & TASK_FLAGS_USERLEVEL ) {
+
+                            kFreeMemory( pstTask->pvMemoryAddress );
+
+                        }
 
                     }
 

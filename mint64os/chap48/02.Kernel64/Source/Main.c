@@ -15,6 +15,7 @@
 #include "2DGraphics.h"
 #include "MPConfigurationTable.h"
 #include "WindowManagerTask.h"
+#include "SystemCall.h"
 
 // Application Processor를 위한 메인 함수
 void MainForApplicationProcessor( void );
@@ -141,6 +142,10 @@ void Main( void ) {
 
     }
 
+    kPrintf( "[*] System Call MSR Initialize [Pass]\n" );
+    iCursorY++;
+    kInitializeSystemCall();
+
     kCreateTask( TASK_FLAGS_LOWEST | TASK_FLAGS_THREAD | TASK_FLAGS_SYSTEM | TASK_FLAGS_IDLE, 0, 0, ( QWORD ) kIdleTask, kGetAPICID() );
 
     if( *( BYTE* ) VBE_STARTGRAPHICMODEFLAGADDRESS == 0 ) {
@@ -175,7 +180,7 @@ void MainForApplicationProcessor( void ) {
 
     kEnableInterrupt();
 
-    // kPrintf( "Application Processor[APIC ID: %d] is Activated\n", kGetAPICID() );
+    kInitializeSystemCall();
 
     kIdleTask();
 
