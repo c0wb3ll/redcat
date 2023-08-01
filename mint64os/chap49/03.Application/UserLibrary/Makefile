@@ -1,12 +1,11 @@
 NASM64 = nasm -f elf64
-GCC64 = gcc -c -m64 -ffreestanding
-LD64 = ld -melf_x86_64 -T ../elf_x86_64.x -nostdlib -e Main -Ttext 0x200000
-OBJCOPY64 = objcopy -j .text -j .data -j .rodata -j .bss -S -O binary
+GCC64 = gcc -c -m64 -ffreestanding -mcmodel=large -fno-pie
+AR64 = ar rcs
 
 OBJECTDIRECTORY = Temp
 SOURCEDIRECTORY = Source
 
-all: prepare Kernel64.bin
+all: prepare libMINT64OS
 
 prepare:
 	mkdir -p $(OBJECTDIRECTORY)
@@ -16,25 +15,18 @@ dep:
 	make -C $(OBJECTDIRECTORY) -f ../makefile InternalDependency
 	@echo [+] Dependency Search Complete
 
-ExecuteInternalBuild: dep
-	make -C $(OBJECTDIRECTORY) -f ../makefile Kernel64.elf
-
-Kernel64.bin: ExecuteInternalBuild
-	$(OBJCOPY64) $(OBJECTDIRECTORY)/Kernel64.elf $@
+libMINT64OS: dep
+	make -C $(OBJECTDIRECTORY) -f ../makefile libMINT64OS.a
+	cp $(OBJECTDIRECTORY)/libMINT64OS.a ./
 
 clean:
 	rm -f *.bin
 	rm -f $(OBJECTDIRECTORY)/*.*
 
-ENTRYPOINTSOURCEFILE = ../$(SOURCEDIRECTORY)/EntryPoint.s
-ENTRYPOINTOBJECTFILE = EntryPoint.o
 CSOURCEFILES = $(wildcard ../$(SOURCEDIRECTORY)/*.c)
 ASSEMBLYSOURCEFILES = $(wildcard ../$(SOURCEDIRECTORY)/*.asm)
 COBJECTFILES = $(notdir $(patsubst %.c, %.o, $(CSOURCEFILES)))
 ASSEMBLYOBJECTFILES = $(notdir $(patsubst %.asm, %.o, $(ASSEMBLYSOURCEFILES)))
-
-$(ENTRYPOINTOBJECTFILE): $(ENTRYPOINTSOURCEFILE)
-	$(NASM64) -o $@ $<
 
 %.o: ../$(SOURCEDIRECTORY)/%.c
 	$(GCC64) -c $<
@@ -45,8 +37,8 @@ $(ENTRYPOINTOBJECTFILE): $(ENTRYPOINTSOURCEFILE)
 InternalDependency:
 	$(GCC64) -MM $(CSOURCEFILES) > Dependency.dep
 
-Kernel64.elf: $(ENTRYPOINTOBJECTFILE) $(COBJECTFILES) $(ASSEMBLYOBJECTFILES)
-	$(LD64) -o $@ $^
+libMINT64OS.a: $(ASSEMBLYOBJECTFILES) $(COBJECTFILES)
+	$(AR64) $@ $^
 
 ifeq (Dependency.dep, $(wildcard Dependency.dep))
 include Dependency.dep

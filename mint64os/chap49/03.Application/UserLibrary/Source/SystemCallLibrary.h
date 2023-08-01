@@ -89,3 +89,19 @@ BOOL DrawText( QWORD qwWindowID, int iX, int iY, COLOR stTextColor, COLOR stBack
 void MoveCursor( int iX, int iY );
 void GetCursorPosition( int* piX, int* piY );
 BOOL BitBlt( QWORD qwWindowID, int iX, int iY, COLOR* pstBuffer, int iWidth, int iHeight );
+
+BOOL JPEGInit(JPEG *jpeg, BYTE* pbFileBuffer, DWORD dwFileSize);
+BOOL JPEGDecode(JPEG *jpeg, COLOR* rgb);
+
+BOOL ReadRTCTime( BYTE* pbHour, BYTE* pbMinute, BYTE* pbSecond );
+BOOL ReadRTCDate( WORD* pwYear, BYTE* pbMonth, BYTE* pbDayOfMonth, BYTE* pbDayOfWeek );
+
+void SendSerialData( BYTE* pbBuffer, int iSize );
+int ReceiveSerialData( BYTE* pbBuffer, int iSize );
+void ClearSerialFIFO( void );
+
+QWORD GetTotalRAMSize( void );
+QWORD GetTickCount( void );
+void Sleep( QWORD qwMillisecond );
+
+#endif /*__SYSTEMCALLLIBRARY_H__*/

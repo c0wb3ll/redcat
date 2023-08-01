@@ -91,7 +91,7 @@ DWORD fread( void* pvBuffer, DWORD dwSize, DWORD dwCount, FILE* pstFile ) {
     PARAM( 0 ) = ( QWORD ) pvBuffer;
     PARAM( 1 ) = ( QWORD ) dwSize;
     PARAM( 2 ) = ( QWORD ) dwCount;
-    PARAM( 3 ) = ( QWORD ) pstFile
+    PARAM( 3 ) = ( QWORD ) pstFile;
 
     return ExecuteSystemCall( SYSCALL_FREAD, &stParameter );
 
