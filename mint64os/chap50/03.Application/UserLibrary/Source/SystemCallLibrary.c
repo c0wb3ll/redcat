@@ -331,6 +331,33 @@ BOOL ChangeProcessorAffinity( QWORD qwTaskID, BYTE bAffinity ) {
 
 }
 
+// 응용 프로그램 생성
+QWORD ExecuteProgram( const char* pcFileName, const char* pcArgumentString, BYTE bAffinity ) {
+
+    PARAMETERTABLE stParameter;
+
+    PARAM( 0 ) = ( QWORD ) pcFileName;
+    PARAM( 1 ) = ( QWORD ) pcArgumentString;
+    PARAM( 2 ) = ( QWORD ) bAffinity;
+
+    return ExecuteSystemCall( SYSCALL_EXECUTEPROGRAM, &stParameter );
+
+}
+
+// 스레드 생성
+QWORD CreateThread( QWORD qwEntryPoint, QWORD qwArgument, BYTE bAffinity ) {
+
+    PARAMETERTABLE stParameter;
+
+    PARAM( 0 ) = ( QWORD ) qwEntryPoint;
+    PARAM( 1 ) = ( QWORD ) qwArgument;
+    PARAM( 2 ) = ( QWORD ) bAffinity;
+    PARAM( 3 ) = ( QWORD ) exit;
+
+    return ExecuteSystemCall( SYSCALL_EXECUTEPROGRAM, &stParameter );
+
+}
+
 // 배경 윈도우의 ID를 반환
 QWORD GetBackgroundWindowID( void ) {
 
