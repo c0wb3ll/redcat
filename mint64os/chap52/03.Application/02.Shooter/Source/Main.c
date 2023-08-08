@@ -298,6 +298,6 @@ void DrawGameArea( QWORD qwWindowID, POINT* pstMouseXY ) {
     DrawLine( qwWindowID, pstMouseXY->iX, pstMouseXY->iY - RADIUS, pstMouseXY->iX, pstMouseXY->iY + RADIUS, RGB( 255, 135, 135 ) );
     DrawLine( qwWindowID, pstMouseXY->iX - RADIUS, pstMouseXY->iY, pstMouseXY->iX + RADIUS, pstMouseXY->iY, RGB( 255, 135, 135 ) );
 
-    DrawRect( qwWindowID, 0, WINDOW_TITLEBAR_HEIGHT + INFORMATION_HEIGHT, WINDOW_WIDTH - 1, WINDOW_HEIGHT - 1, RGB( 160, 255, 140 ), FALSE );
+    DrawRect( qwWindowID, 0, WINDOW_TITLEBAR_HEIGHT + INFORMATION_HEIGHT, WINDOW_WIDTH - 1, WINDOW_HEIGHT - 1, RGB( 135, 255, 135 ), FALSE );
 
 }
