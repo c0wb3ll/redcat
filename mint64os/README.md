@@ -66,4 +66,5 @@
 - 2023.08.02	Chap#50 Done!
 - 2023.08.08	Chap#51	Done!
 - 2023.08.08	Chap#52 Done!
-- 2023.08.09	CHap#53 Done!
+- 2023.08.09	Chap#53 Done!
+- 2023.08.09	Chap#54 Done!

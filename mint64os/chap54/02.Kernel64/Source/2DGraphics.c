@@ -344,6 +344,51 @@ void kInternalDrawCircle( const RECT* pstMemoryArea, COLOR* pstMemoryAddress, in
 // 문자 출력
 void kInternalDrawText( const RECT* pstMemoryArea, COLOR* pstMemoryAddress, int iX, int iY, COLOR stTextColor, COLOR stBackgroundColor, const char* pcString, int iLength ) {
 
+    int i;
+    int j;
+
+    for( i = 0; i < iLength; ) {
+
+        if( ( pcString[ i ] & 0x80 ) == 0 ) {
+
+            for( j = i; j < iLength; j++ ) {
+
+                if( pcString[ j ] & 0x80 ) {
+
+                    break;
+
+                }
+
+            }
+
+            kInternalDrawEnglishText( pstMemoryArea, pstMemoryAddress, iX + ( i * FONT_ENGLISHWIDTH ), iY, stTextColor, stBackgroundColor, pcString + i, j - i );
+            i = j;
+
+        }
+        else {
+
+            for( j = i; j < iLength; j++ ) {
+
+                if( ( pcString[ j ] & 0x80 ) == 0 ) {
+
+                    break;
+
+                }
+
+            }
+
+            kInternalDrawHangulText( pstMemoryArea, pstMemoryAddress, iX + i * FONT_ENGLISHWIDTH, iY, stTextColor, stBackgroundColor, pcString + i, j - i );
+            i = j;
+
+        }
+
+    }
+
+}
+
+// 영문자 문자 출력
+void kInternalDrawEnglishText( const RECT* pstMemoryArea, COLOR* pstMemoryAddress, int iX, int iY, COLOR stTextColor, COLOR stBackgroundColor, const char* pcString, int iLength ) {
+
     int iCurrentX, iCurrentY;
     int i, j, k;
     BYTE bBitmap;
@@ -409,6 +454,103 @@ void kInternalDrawText( const RECT* pstMemoryArea, COLOR* pstMemoryAddress, int 
         }
 
         iCurrentX += FONT_ENGLISHWIDTH;
+
+    }
+
+}
+
+// 한글 출력
+void kInternalDrawHangulText( const RECT* pstMemoryArea, COLOR* pstMemoryAddress, int iX, int iY, COLOR stTextColor, COLOR stBackgroundColor, const char* pcString, int iLength ) {
+
+    int iCurrentX, iCurrentY;
+    WORD wHangul;
+    WORD wOffsetInGroup;
+    WORD wGroupIndex;
+    int i, j, k;
+    WORD wBitmap;
+    WORD wCurrentBitmask;
+    int iBitmapStartIndex;
+    int iMemoryAreaWidth;
+    RECT stFontArea;
+    RECT stOverlappedArea;
+    int iStartYOffset;
+    int iStartXOffset;
+    int iOverlappedWidth;
+    int iOverlappedHeight;
+
+    iCurrentX = iX;
+    
+    iMemoryAreaWidth = kGetRectangleWidth( pstMemoryArea );
+
+    for( k = 0; k < iLength; k += 2 ) {
+
+        iCurrentY = iY * iMemoryAreaWidth;
+
+        kSetRectangleData( iCurrentX, iY, iCurrentX + FONT_HANGULWIDTH - 1, iY + FONT_HANGULHEIGHT - 1, &stFontArea );
+
+        if( kGetOverlappedRectangle( pstMemoryArea, &stFontArea, &stOverlappedArea ) == FALSE ) {
+
+            iCurrentX += FONT_HANGULWIDTH;
+            continue;
+
+        }
+
+        wHangul = ( ( WORD ) pcString[ k ] << 8 ) | ( BYTE ) ( pcString[ k + 1 ] );
+
+        if( ( 0xB0A1 <= wHangul ) && ( wHangul <= 0xC8FE ) ) {
+
+            wOffsetInGroup = ( wHangul - 0xB0A1 ) & 0xFF;
+            wGroupIndex = ( ( wHangul - 0xB0A1 ) >> 8 ) & 0xFF;
+            wHangul = ( wGroupIndex * 94 ) + wOffsetInGroup + 51;
+
+        }
+        else if( ( 0xA4A1 <= wHangul ) && ( wHangul <= 0xA4D3 ) ) {
+
+            wHangul = wHangul - 0xA4A1;
+
+        }
+        else {
+
+            continue;
+
+        }
+
+        iBitmapStartIndex = wHangul * FONT_HANGULHEIGHT;
+
+        iStartXOffset = stOverlappedArea.iX1 - iCurrentX;
+        iStartYOffset = stOverlappedArea.iY1 - iY;
+        iOverlappedWidth = kGetRectangleWidth( &stOverlappedArea );
+        iOverlappedHeight = kGetRectangleHeight( &stOverlappedArea );
+
+        iBitmapStartIndex += iStartYOffset;
+
+        for( j = iStartYOffset; j < iOverlappedHeight; j++ ) {
+
+            wBitmap = g_vusHangulFont[ iBitmapStartIndex++ ];
+            wCurrentBitmask = 0x01 << ( FONT_HANGULWIDTH - 1 - iStartXOffset );
+
+            for( i = iStartXOffset; i < iOverlappedWidth; i++ ) {
+
+                if( wBitmap & wCurrentBitmask ) {
+
+                    pstMemoryAddress[ iCurrentY + iCurrentX + i ] = stTextColor;
+
+                }
+                else {
+
+                    pstMemoryAddress[ iCurrentY + iCurrentX + i ] = stBackgroundColor;
+
+                }
+
+                wCurrentBitmask = wCurrentBitmask >> 1;
+
+            }
+
+            iCurrentY += iMemoryAreaWidth;
+
+        }
+
+        iCurrentX += FONT_HANGULWIDTH;
 
     }
 
