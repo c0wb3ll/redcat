@@ -1,0 +1,36 @@
+#!/usr/bin/env python3
+import sys
+import struct
+
+if len(sys.argv) < 4:
+    print("[ERROR] ImageMaker BootLoader.bin Kernel32.bin Kernel64.bin")
+    sys.exit(-1)
+
+with open("Disk.img", "wb") as disk_file:
+    with open(sys.argv[1], "rb") as f:
+        boot_loader = f.read()
+    with open(sys.argv[2], "rb") as f:
+        kernel32 = f.read()
+    with open(sys.argv[3], "rb") as f:
+        kernel64 = f.read()
+
+    if len(boot_loader) % 512 != 0:
+        boot_loader += b'\x00'*(512 - (len(boot_loader)%512))
+    if len(kernel32) % 512 != 0:
+        kernel32 += b'\x00'*(512 - (len(kernel32)%512))
+    if len(kernel64) % 512 != 0:
+        kernel64 += b'\x00'*(512 - (len(kernel64)%512))
+
+    disk_data = boot_loader + kernel32 + kernel64
+
+    sector_count_32 = int(len(kernel32) / 512)
+    sector_count_64 = int(len(kernel64) / 512)
+    total_sector_count_raw = struct.pack("<H", sector_count_32 + sector_count_64)
+    kernel32_sector_count_raw = struct.pack("<H", sector_count_32)
+
+    disk = disk_data[:5]
+    disk += total_sector_count_raw
+    disk += kernel32_sector_count_raw
+    disk += disk_data[9:]
+
+    disk_file.write(disk)
