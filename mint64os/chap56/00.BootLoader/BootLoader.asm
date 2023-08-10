@@ -53,7 +53,7 @@ RESETDISK:
     mov es, si
     mov bx, 0x0000
 
-    mov di, word[TOTALSECTORCOUNT]
+    mov di, 1146
 
 READDATA:
     cmp di, 0

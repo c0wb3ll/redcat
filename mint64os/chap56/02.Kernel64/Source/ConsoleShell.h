@@ -8,6 +8,10 @@
 
 typedef void ( * CommandFunction ) ( const char* pcParameter );
 
+#define PACKAGESIGNATURE                   "MINT64OSPACKAGE"
+
+#define MAXFILENAMELENGTH                   24
+
 #pragma pack( push, 1 )
 
 typedef struct kShellCommandEntryStruct {
@@ -25,6 +29,24 @@ typedef struct kParameterListStruct {
     int iCurrentPosition;
 
 } PARAMETERLIST;
+
+typedef struct PackageItemStruct {
+
+    char vcFileName[ MAXFILENAMELENGTH ];
+
+    DWORD dwFileLength;
+
+} PACKAGEITEM;
+
+typedef struct PackageHeaderStruct {
+
+    char vcSignature[ 16 ];
+
+    DWORD dwHeaderSize;
+
+    PACKAGEITEM vstItem[ 0 ];
+
+} PACKAGEHEADER;
 
 #pragma pack( pop )
 
@@ -65,5 +87,6 @@ static void kChangeTaskAffinity( const char* pcParameterBuffer );
 static void kShowVBEModeInfo( const char* pcParameterBuffer );
 static void kTestSystemCall( const char* pcParameterBuffer );
 static void kExecuteApplicationProgram( const char* pcParameterBuffer );
+static void kInstallPackage( const char* pcParameterBuffer );
 
 #endif /*__CONSOLESHELL_H__*/

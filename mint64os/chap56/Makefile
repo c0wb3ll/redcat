@@ -25,6 +25,7 @@ Disk.img: 00.BootLoader/BootLoader.bin 01.Kernel32/Kernel32.bin 02.Kernel64/Kern
 	@echo [*] Build Disk Image
 
 	04.Utility/00.ImageMaker/ImageMaker $^
+	cat Disk.img Package.img > DiskWithPackage.img
 	
 	@echo [*] Build Disk Image Complete
 
@@ -41,3 +42,4 @@ clean:
 	make -C 02.Kernel64 clean
 	make -C 03.Application clean
 	rm -f Disk.img
+	rm -f DiskWithPackage.img
