@@ -1,4 +1,4 @@
-# make 64 bit OS study
+# make CPU with Nand2Tetris
 
 ## Reference
 
