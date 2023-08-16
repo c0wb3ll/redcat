@@ -13,4 +13,5 @@
 - [https://www.coursera.org/learn/build-a-computer](https://www.coursera.org/learn/build-a-computer)
 
 # Progress
-- 2023.08.13 Start!
+- 2023.08.16 Start!
+- 2023.08.16 : 1Week Done!

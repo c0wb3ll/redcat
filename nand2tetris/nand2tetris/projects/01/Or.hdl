@@ -15,22 +15,18 @@ CHIP Or {
 
     PARTS:
     // Put your code here:
-    Not(in=a, out=nota);
-    Not(in=b, out=notb);
-    And(a=nota, b=notb, out=notaandnotb);
-    Not(in=notaandnotb, out=out);
+    Nand( a = a, b = a, out = ananda );
+    Nand( a = b, b = b, out = bnandb );
+    Nand( a = ananda, b = bnandb, out = out );
+
 }
 
 /*
 
-nand
-and
-not
+a or b = not( not(a) and not(b) )
 
-0 0 = 0
+not(a) nand not(b)
 
-a or b
-
-not(a) and not(b)
+(a nand a) nand (b nand b)
 
 */

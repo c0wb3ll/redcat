@@ -15,78 +15,29 @@ CHIP Mux {
 
     PARTS:
     // Put your code here:
-    And(a=b, b=sel, out=bandsel);
-    Not(in=sel, out=notsel);
-    And(a=a, b=notsel, out=aandnotsel);
-    Or(a=bandsel, b=aandnotsel, out=out);
+    Nand( a = sel, b = sel, out = selnandsel );
+    Nand( a = a, b = selnandsel, out = aNandselnandsel );
+    Nand( a = b, b = sel, out = bnandsel );
+    Nand( a = aNandselnandsel, b = bnandsel, out = out );
+    
 }
+
 /*
 
+(a and not(sel)) or ( b and sel )
 
-a and b and sel
+x or y
 
-or
+not( not(x) and not(y) )
 
-not(a) and b and sel
+not(x) nand not(y)
 
-or
+not( a and not(sel) ) nand not( b and sel )
 
-a and not(b) and not(sel)
+(a nand not(sel)) nand ( b nand sel )
 
-or
-
-a and b and not(sel)
-
+( a nand (sel nand sel) ) nand ( b nand sel )
 
 
-->
-
-a and not(sel) and not(b)
-
-or
-
-a and not(sel) and b
-
--- (a and not(sel)) = X
--- (x and not(b)) or (x and b)
--- x
-
-
-
-a and b and sel
-
-or
-
-not(a) and b and sel
-
-or
-
-a and not(sel)
-
-
-->
-
-a and b and sel
-
-or
-
-not(a) and b and sel
-
---(b and sel) = x
--- (x and not(a)) or (x and a)
--- x
-
-b and sel
-
-or
-
-a and not(sel)
-
----
-
-And(a=b, b=sel, out=bandsel);
-Not(in=sel, out=notsel);
-And(a=a, b=notsel, out=aandnotsel);
-Or(a=bandsel, b=aandnotsel, out=out);
 
 */
