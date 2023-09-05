@@ -14,4 +14,7 @@
 
 # Progress
 - 2023.08.16 Start!
-- 2023.08.16 : 1Week Done!
+- 2023.08.16 1Week Done!
+- 2023.08.17 2Week Done!
+- 2023.XX.XX 3Week Done!
+- 2023.09.05 4Week Done!
